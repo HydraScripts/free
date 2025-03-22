@@ -39,7 +39,6 @@ if hf then
   end)
 end
 
-local TEST = httpget("https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test")
 
 if table.find(scripts, "https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test") then
   print("Script was run by loadstring, probably. Hooking/changing HttpGet works.")
