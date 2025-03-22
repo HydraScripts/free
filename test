@@ -1,39 +1,47 @@
-getgenv().scripts = {}
-table.insert(getgenv().scripts, "https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test")
+local scripts = {}
 
--- First Part
-local hg = HttpGet or httpget or httpGet or (syn and syn.request) or (http and http.request) -- Corrected to handle different executors
+local hg = HttpGet or httpget or httpGet or (http and http.request)
 
 local hf = hookfunction
 local c = clonefunction or newcclosure
-if c then -- It's important to check if clonefunction/newcclosure exists!
-  hg = c(hg) 
+if c then
+  hg = c(hg)
 end
-
-
-getgenv().scripts = getgenv().scripts or {}
 
 local function GMan(url)
-  table.insert(getgenv().scripts, url)
-  return hg({Url = url}).Body --Crucial: Correctly call the possibly-synapse request function.
+  table.insert(scripts, url)
+  local response
+    if http and http.request then
+      response = hg({Url = url})
+      if type(response) == "table" and response.Body then
+          return response.Body
+      elseif type(response) == "string" then
+          return response
+      else
+           warn("Unexpected response from http.request:", response)
+          return ""
+      end
+    else
+        return hg(url)
+    end
+
 end
 
--- These are *probably* not necessary, but we'll keep them for consistency
--- with the original intent, assuming the exploit might use these aliases.
 HttpGet, httpget, httpGet = GMan, GMan, GMan
 
 if hf then
   local h_g
-  h_g = hookfunction(game.HttpGet, function(self, url, ...) -- More robust hooking, handle self and ...
+  h_g = hookfunction(game.HttpGet, function(self, url, ...)
     if type(url) == "string" then
-        table.insert(getgenv().scripts, url)
+        table.insert(scripts, url)
     end
-      return h_g(self, url, ...) -- Pass all arguments correctly
+      return h_g(self, url, ...)
   end)
 end
 
--- Second Part
-if table.find(getgenv().scripts, "https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test") then
+local TEST = httpget("https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test")
+
+if table.find(scripts, "https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test") then
   print("Script was run by loadstring, probably. Hooking/changing HttpGet works.")
 else
   warn("SCRIPT RAN WITHOUT LOADSTRING, ALARM!!!!")
