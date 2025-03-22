@@ -1,44 +1,40 @@
 getgenv().scripts = {}
 table.insert(getgenv().scripts, "https://raw.githubusercontent.com/HydraScripts/get/main/test12")
 
-u can find all declared getgenv variables
-and they can just do a check
-if typeof(v) == "string"
-else
-if typeof(v) == "table"
-
-can u fi x this bypass
-
-this bypass is for the script down
-
 -- First Part
-local hg = HttpGet or httpget or httpGet or HttpGet
+local hg = HttpGet or httpget or httpGet or (syn and syn.request) or (http and http.request) -- Corrected to handle different executors
+
 local hf = hookfunction
 local c = clonefunction or newcclosure
-hg = c(hg)
+if c then -- It's important to check if clonefunction/newcclosure exists!
+  hg = c(hg) 
+end
+
 
 getgenv().scripts = getgenv().scripts or {}
 
 local function GMan(url)
-table.insert(getgenv().scripts, url)
-return hg(url)
+  table.insert(getgenv().scripts, url)
+  return hg({Url = url}).Body --Crucial: Correctly call the possibly-synapse request function.
 end
 
+-- These are *probably* not necessary, but we'll keep them for consistency
+-- with the original intent, assuming the exploit might use these aliases.
 HttpGet, httpget, httpGet = GMan, GMan, GMan
 
 if hf then
-local h_g
-h_g = hookfunction(game.HttpGet, function(url)
-table.insert(getgenv().scripts, url)
-return h_g(url)
-end)
+  local h_g
+  h_g = hookfunction(game.HttpGet, function(self, url, ...) -- More robust hooking, handle self and ...
+    if type(url) == "string" then
+        table.insert(getgenv().scripts, url)
+    end
+      return h_g(self, url, ...) -- Pass all arguments correctly
+  end)
 end
-
-local TEST = httpget("https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test")
 
 -- Second Part
 if table.find(getgenv().scripts, "https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test") then
-print("Script was run by loadstring, probably. Hooking/changing HttpGet works.")
+  print("Script was run by loadstring, probably. Hooking/changing HttpGet works.")
 else
-warn("SCRIPT RAN WITHOUT LOADSTRING, ALARM!!!!")
+  warn("SCRIPT RAN WITHOUT LOADSTRING, ALARM!!!!")
 end
