@@ -41,7 +41,7 @@ end
 
 
 if table.find(scripts, "https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test") then
-  print("Script was run by loadstring, probably. Hooking/changing HttpGet works.")
+  print("Script was run yes by loadstring, probably. Hooking/changing HttpGet works.")
 else
   warn("SCRIPT RAN WITHOUT LOADSTRING, ALARM!!!!")
 end
