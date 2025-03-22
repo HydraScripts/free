@@ -1,5 +1,5 @@
 getgenv().scripts = {}
-table.insert(getgenv().scripts, "https://raw.githubusercontent.com/HydraScripts/get/main/test12")
+table.insert(getgenv().scripts, "https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test")
 
 -- First Part
 local hg = HttpGet or httpget or httpGet or (syn and syn.request) or (http and http.request) -- Corrected to handle different executors
