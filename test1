@@ -1,0 +1,47 @@
+local scripts = {}
+
+local hg = HttpGet or httpget or httpGet or (http and http.request)
+
+local hf = hookfunction
+local c = clonefunction or newcclosure
+if c then
+  hg = c(hg)
+end
+
+local function GMan(url)
+  table.insert(scripts, url)
+  local response
+    if http and http.request then
+      response = hg({Url = url})
+      if type(response) == "table" and response.Body then
+          return response.Body
+      elseif type(response) == "string" then
+          return response
+      else
+           warn("Unexpected response from http.request:", response)
+          return ""
+      end
+    else
+        return hg(url)
+    end
+
+end
+
+HttpGet, httpget, httpGet = GMan, GMan, GMan
+
+if hf then
+  local h_g
+  h_g = hookfunction(game.HttpGet, function(self, url, ...)
+    if type(url) == "string" then
+        table.insert(scripts, url)
+    end
+      return h_g(self, url, ...)
+  end)
+end
+
+
+if table.find(scripts, "https://raw.githubusercontent.com/HydraScripts/free/refs/heads/main/test1") then
+  print("Script was run yes by loadstring, probably. Hooking/changing HttpGet works.")
+else
+  warn("SCRIPT RAN WITHOUT LOADSTRING, ALARM!!!!")
+end
