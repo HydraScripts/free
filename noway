@@ -1,0 +1,213 @@
+--// HydraLib V1.3 Fixed Version
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local HydraLib = {}
+HydraLib.__index = HydraLib
+
+local BASE_ZINDEX_COUNTER = 1
+
+local function createUICorner(instance, radius)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	corner.Parent = instance
+end
+
+--// SMOOTH SLIDER (no lag while dragging)
+local function CreateSlider(parent, config)
+	local min, max = config.Min or 0, config.Max or 100
+	local value = math.clamp(config.Default or min, min, max)
+	local increment = config.Increment or 1
+	local callback = config.Callback or function() end
+
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, 0, 0, 50)
+	frame.BackgroundTransparency = 1
+	frame.Parent = parent
+
+	local label = Instance.new("TextLabel", frame)
+	label.Size = UDim2.new(1, 0, 0, 20)
+	label.Position = UDim2.new(0, 0, 0, 0)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = Color3.new(1,1,1)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 14
+	label.TextXAlignment = Enum.TextXAlignment.Left
+
+	local track = Instance.new("Frame", frame)
+	track.Size = UDim2.new(1, 0, 0, 10)
+	track.Position = UDim2.new(0, 0, 0, 30)
+	track.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	createUICorner(track, 5)
+
+	local fill = Instance.new("Frame", track)
+	fill.BackgroundColor3 = config.Color or Color3.fromRGB(0, 120, 255)
+	fill.Size = UDim2.new((value-min)/(max-min), 0, 1, 0)
+	createUICorner(fill, 5)
+
+	local dragging = false
+
+	local function Update(input)
+		local rel = (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
+		rel = math.clamp(rel, 0, 1)
+		local newValue = math.floor((min + (max-min)*rel)/increment + 0.5)*increment
+		newValue = math.clamp(newValue, min, max)
+		fill.Size = UDim2.new((newValue-min)/(max-min), 0, 1, 0)
+		label.Text = (config.Name or "Slider") .. ": " .. tostring(newValue)
+		task.spawn(callback, newValue)
+	end
+
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			Update(input)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			Update(input)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+
+	Update({Position = track.AbsolutePosition + Vector3.new(track.AbsoluteSize.X * (value-min)/(max-min),0,0)})
+
+	return frame
+end
+
+--// ULTRA CLEAN DROPDOWN (no bugs)
+local function CreateDropdown(parent, config, screenGui)
+	local options = config.Options or {}
+	local selected = options[1] or "Select..."
+	local callback = config.Callback or function() end
+
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, 0, 0, 60)
+	frame.BackgroundTransparency = 1
+	frame.Parent = parent
+
+	local label = Instance.new("TextLabel", frame)
+	label.Size = UDim2.new(1, 0, 0, 20)
+	label.BackgroundTransparency = 1
+	label.Text = config.Name or "Dropdown"
+	label.TextColor3 = Color3.new(1,1,1)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 14
+	label.TextXAlignment = Enum.TextXAlignment.Left
+
+	local button = Instance.new("TextButton", frame)
+	button.Size = UDim2.new(1, 0, 0, 30)
+	button.Position = UDim2.new(0, 0, 0, 30)
+	button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	button.Text = selected .. " ▼"
+	button.TextColor3 = Color3.new(1,1,1)
+	button.Font = Enum.Font.Gotham
+	button.TextSize = 14
+	createUICorner(button, 6)
+
+	local listFrame = Instance.new("Frame")
+	listFrame.Size = UDim2.new(1, 0, 0, #options*30)
+	listFrame.Position = UDim2.new(0, 0, 1, 0)
+	listFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	listFrame.Visible = false
+	createUICorner(listFrame, 6)
+	listFrame.Parent = frame
+
+	local layout = Instance.new("UIListLayout", listFrame)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	for _, opt in ipairs(options) do
+		local optBtn = Instance.new("TextButton", listFrame)
+		optBtn.Size = UDim2.new(1, 0, 0, 30)
+		optBtn.BackgroundTransparency = 1
+		optBtn.Text = opt
+		optBtn.TextColor3 = Color3.new(1,1,1)
+		optBtn.Font = Enum.Font.Gotham
+		optBtn.TextSize = 14
+
+		optBtn.MouseButton1Click:Connect(function()
+			selected = opt
+			button.Text = selected .. " ▼"
+			listFrame.Visible = false
+			task.spawn(callback, selected)
+		end)
+	end
+
+	button.MouseButton1Click:Connect(function()
+		listFrame.Visible = not listFrame.Visible
+	end)
+
+	return frame
+end
+
+--// MINI LIBRARY BUILDING (Window + Tabs)
+function HydraLib:MakeWindow(title)
+	local self = setmetatable({}, HydraLib)
+
+	self.Gui = Instance.new("ScreenGui", CoreGui)
+	self.Gui.Name = "Hydra_"..title:gsub("%s","")
+	self.Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+	local Main = Instance.new("Frame", self.Gui)
+	Main.Size = UDim2.new(0, 500, 0, 400)
+	Main.Position = UDim2.new(0.5, -250, 0.5, -200)
+	Main.BackgroundColor3 = Color3.fromRGB(25,25,25)
+	Main.BorderSizePixel = 0
+	createUICorner(Main, 10)
+
+	local dragging, dragStart, startPos
+
+	Main.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = Main.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+
+	local TabBar = Instance.new("Frame", Main)
+	TabBar.Size = UDim2.new(1, 0, 0, 40)
+	TabBar.BackgroundColor3 = Color3.fromRGB(35,35,35)
+	createUICorner(TabBar, 10)
+
+	local Content = Instance.new("Frame", Main)
+	Content.Size = UDim2.new(1, 0, 1, -40)
+	Content.Position = UDim2.new(0, 0, 0, 40)
+	Content.BackgroundTransparency = 1
+
+	local Layout = Instance.new("UIListLayout", Content)
+	Layout.Padding = UDim.new(0, 10)
+
+	self.Content = Content
+
+	return self
+end
+
+function HydraLib:AddSlider(cfg)
+	return CreateSlider(self.Content, cfg)
+end
+
+function HydraLib:AddDropdown(cfg)
+	return CreateDropdown(self.Content, cfg, self.Gui)
+end
+
+return HydraLib
