@@ -1,0 +1,759 @@
+--[[
+	Hydra UI Library
+	A simple, modern UI library inspired by the structure of OrionLib.
+	Version 1.1 - Fixed method assignment for tab elements.
+	Features:
+		- Draggable Window
+		- Tabs
+		- Sliders
+		- Toggles (Checkboxes)
+		- Dropdowns
+--]]
+
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local HydraLib = {}
+HydraLib.__index = HydraLib
+HydraLib._windows = {}
+local ZINDEX_COUNTER = 1
+
+--==============================================================================--
+--                           INTERNAL HELPER FUNCTIONS                          --
+--==============================================================================--
+-- These create the actual GUI elements and are not directly called by the user.
+
+local function _createSlider(parent, config)
+	local minValue = config.Min or 0
+	local maxValue = config.Max or 100
+	local initialValue = math.clamp(config.Default or minValue, minValue, maxValue)
+	local label = config.Name or "Slider"
+	local valueName = config.ValueName or ""
+	local increment = config.Increment or 1
+	local callback = config.Callback or function() end
+
+	local container = Instance.new("Frame")
+	container.Name = label:gsub("%s+", "") .. "SliderContainer"
+	container.Size = UDim2.new(1, 0, 0, 45)
+	container.BackgroundTransparency = 1
+	container.Parent = parent
+	container.LayoutOrder = config._LayoutOrder or 0
+
+	local SliderLabel = Instance.new("TextLabel", container)
+	SliderLabel.Size = UDim2.new(1, 0, 0, 15)
+	SliderLabel.Position = UDim2.new(0, 0, 0, 0)
+	SliderLabel.BackgroundTransparency = 1
+	SliderLabel.Font = Enum.Font.Gotham
+	SliderLabel.TextSize = 14
+	SliderLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	local SliderFrame = Instance.new("Frame", container)
+	SliderFrame.Name = "SliderTrack"
+	SliderFrame.Size = UDim2.new(1, 0, 0, 10)
+	SliderFrame.Position = UDim2.new(0, 0, 0, 20)
+	SliderFrame.BackgroundColor3 = config.TrackColor or Color3.fromRGB(50, 50, 50)
+	SliderFrame.BorderSizePixel = 0
+	SliderFrame.Active = true
+	local SliderCorner = Instance.new("UICorner", SliderFrame)
+	SliderCorner.CornerRadius = UDim.new(0, 5)
+
+	local Fill = Instance.new("Frame", SliderFrame)
+	Fill.Name = "SliderFill"
+	Fill.BackgroundColor3 = config.Color or Color3.fromRGB(0, 120, 255)
+	Fill.BorderSizePixel = 0
+	local FillCorner = Instance.new("UICorner", Fill)
+	FillCorner.CornerRadius = UDim.new(0, 5)
+
+	local currentSliderValue = initialValue
+	local isDraggingSlider = false
+	local dragMoveConnection = nil
+	local dragReleaseConnection = nil
+
+	local function updateSliderDisplay(ratio, triggerCallback)
+        ratio = math.clamp(ratio, 0, 1)
+        local range = maxValue - minValue
+        if range <= 0 then range = 1 end -- Avoid division by zero if Min == Max
+		local rawValue = minValue + ratio * range
+		local steppedValue = math.floor(rawValue / increment + 0.5) * increment
+		local finalValue = math.clamp(steppedValue, minValue, maxValue)
+		local displayRatio = range > 0 and math.clamp((finalValue - minValue) / range, 0, 1) or 0
+
+		if finalValue ~= currentSliderValue or triggerCallback == "force" then
+			currentSliderValue = finalValue
+			TweenService:Create(Fill, TweenInfo.new(0.05), {Size = UDim2.new(displayRatio, 0, 1, 0)}):Play()
+			SliderLabel.Text = label .. ": " .. string.format("%.f", currentSliderValue) .. (valueName ~= "" and " " .. valueName or "")
+			if triggerCallback and triggerCallback ~= "force" then -- Don't trigger on initial force set
+				task.spawn(callback, currentSliderValue)
+			end
+		end
+	end
+
+	local function calculateRatioFromInput(input)
+		RunService.Heartbeat:Wait()
+		local frameAbsPos = SliderFrame.AbsolutePosition
+		local frameAbsSize = SliderFrame.AbsoluteSize
+		local relativeX = input.Position.X - frameAbsPos.X
+		local totalWidth = frameAbsSize.X
+		if totalWidth <= 0 then return (currentSliderValue - minValue) / (maxValue - minValue) end
+		return math.clamp(relativeX / totalWidth, 0, 1)
+	end
+
+	SliderFrame.InputBegan:Connect(function(input)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not isDraggingSlider then
+			isDraggingSlider = true
+			local currentRatio = calculateRatioFromInput(input)
+            updateSliderDisplay(currentRatio, true) -- Trigger callback on initial press
+
+			if dragMoveConnection then dragMoveConnection:Disconnect() end
+			if dragReleaseConnection then dragReleaseConnection:Disconnect() end
+
+			dragMoveConnection = UserInputService.InputChanged:Connect(function(moveInput)
+				if isDraggingSlider and (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) then
+					updateSliderDisplay(calculateRatioFromInput(moveInput), false) -- Only update display while dragging
+				end
+			end)
+
+			dragReleaseConnection = UserInputService.InputEnded:Connect(function(endInput)
+				if isDraggingSlider and (endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch) then
+					isDraggingSlider = false
+					-- Update one last time on release, but usually the callback already fired on InputBegan or the last InputChanged.
+                    -- If you want callback ONLY on release, change the 'true' in InputBegan updateSliderDisplay to 'false'
+                    -- and uncomment the line below / potentially add a debounce.
+					-- updateSliderDisplay(calculateRatioFromInput(endInput), true)
+					if dragMoveConnection then dragMoveConnection:Disconnect(); dragMoveConnection = nil end
+					if dragReleaseConnection then dragReleaseConnection:Disconnect(); dragReleaseConnection = nil end
+				end
+			end)
+		end
+	end)
+
+    local initialRatio = (maxValue - minValue) > 0 and (initialValue - minValue) / (maxValue - minValue) or 0
+	updateSliderDisplay(initialRatio, "force") -- Initial setup
+
+	local function setter(newValue)
+		if type(newValue) == "number" then
+            local range = maxValue - minValue
+            if range <= 0 then return end
+            local newRatio = math.clamp((newValue - minValue) / range, 0, 1)
+            updateSliderDisplay(newRatio, false) -- Update display only, no callback trigger
+        end
+	end
+
+	return container, setter
+end
+
+local function _createToggle(parent, config)
+	local labelText = config.Name or "Toggle"
+	local initialValue = config.Default or false
+	local callback = config.Callback or function() end
+	local toggled = initialValue
+
+	local toggleHeight = 25
+	local checkboxSize = 18
+	local spacing = 8
+
+	local Container = Instance.new("Frame")
+	Container.Name = labelText:gsub("%s+", "") .. "ToggleContainer"
+	Container.Size = UDim2.new(1, 0, 0, toggleHeight)
+	Container.BackgroundTransparency = 1
+	Container.Parent = parent
+	Container.LayoutOrder = config._LayoutOrder or 0
+
+	local Label = Instance.new("TextLabel")
+	Label.Name = "Label"
+	Label.Size = UDim2.new(1, -(checkboxSize + spacing), 1, 0)
+	Label.Position = UDim2.new(0, 0, 0, 0)
+	Label.BackgroundTransparency = 1
+	Label.Font = Enum.Font.Gotham
+	Label.Text = labelText
+	Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+	Label.TextSize = 16
+	Label.TextXAlignment = Enum.TextXAlignment.Left
+	Label.TextYAlignment = Enum.TextYAlignment.Center
+	Label.Parent = Container
+
+	local CheckboxFrame = Instance.new("Frame")
+	CheckboxFrame.Name = "CheckboxFrame"
+	CheckboxFrame.Size = UDim2.new(0, checkboxSize, 0, checkboxSize)
+	CheckboxFrame.Position = UDim2.new(1, -checkboxSize, 0.5, -checkboxSize / 2)
+	CheckboxFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	CheckboxFrame.BorderSizePixel = 1
+	CheckboxFrame.BorderColor3 = Color3.fromRGB(90, 90, 90)
+	CheckboxFrame.Parent = Container
+	local CheckboxCorner = Instance.new("UICorner", CheckboxFrame)
+	CheckboxCorner.CornerRadius = UDim.new(0, 4)
+
+	local Checkmark = Instance.new("Frame", CheckboxFrame)
+	Checkmark.Name = "Checkmark"
+	Checkmark.Size = UDim2.new(0.7, 0, 0.7, 0)
+	Checkmark.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Checkmark.AnchorPoint = Vector2.new(0.5, 0.5)
+	Checkmark.BackgroundColor3 = config.Color or Color3.fromRGB(0, 180, 90)
+	Checkmark.BorderSizePixel = 0
+	Checkmark.BackgroundTransparency = toggled and 0 or 1
+	local CheckmarkCorner = Instance.new("UICorner", Checkmark)
+	CheckmarkCorner.CornerRadius = UDim.new(0, 3)
+
+	local ClickButton = Instance.new("TextButton", Container)
+	ClickButton.Name = "ClickArea"
+	ClickButton.Size = UDim2.new(1, 0, 1, 0)
+	ClickButton.BackgroundTransparency = 1
+	ClickButton.Text = ""
+	ClickButton.ZIndex = 2
+
+	local function updateVisuals(state)
+		TweenService:Create(Checkmark, TweenInfo.new(0.15), { BackgroundTransparency = state and 0 or 1 }):Play()
+		TweenService:Create(CheckboxFrame, TweenInfo.new(0.15), { BackgroundColor3 = state and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(60, 60, 60) }):Play()
+	end
+
+	ClickButton.MouseButton1Click:Connect(function()
+		toggled = not toggled
+		updateVisuals(toggled)
+		task.spawn(callback, toggled)
+	end)
+
+	updateVisuals(toggled)
+
+    local function setter(newState)
+		if type(newState) == "boolean" and newState ~= toggled then
+			toggled = newState
+			updateVisuals(toggled)
+			-- Programmatic set does NOT trigger the callback by default
+		end
+	end
+
+	return Container, setter
+end
+
+local function _createDropdown(parent, config, screenGuiRef)
+	local labelText = config.Name or "Dropdown"
+	local options = config.Options or {"Option 1"}
+	local defaultOption = config.Default
+	local callback = config.Callback or function() end
+
+	local selectedIndex = 1
+	if defaultOption then
+		for i, v in ipairs(options) do
+			if v == defaultOption then
+				selectedIndex = i
+				break
+			end
+		end
+	end
+	local selectedOptionText = options[selectedIndex] or "Select..."
+	local isOpen = false
+
+	local dropdownBaseHeight = 30
+	local labelHeight = 18
+	local totalControlHeight = dropdownBaseHeight + labelHeight
+	local optionsVisibleHeight = 100
+	local optionHeight = 25
+
+	local Container = Instance.new("Frame")
+	Container.Name = labelText:gsub("%s+", "") .. "DropdownContainer"
+	Container.Size = UDim2.new(1, 0, 0, totalControlHeight)
+	Container.BackgroundTransparency = 1
+	Container.ClipsDescendants = false
+	Container.Parent = parent
+	Container.LayoutOrder = config._LayoutOrder or 0
+	Container.ZIndex = ZINDEX_COUNTER * 2 -- Base ZIndex
+
+	local Label = Instance.new("TextLabel")
+	Label.Name = "Label"
+	Label.Size = UDim2.new(1, 0, 0, labelHeight)
+	Label.Position = UDim2.new(0, 0, 0, 0)
+	Label.BackgroundTransparency = 1
+	Label.Font = Enum.Font.Gotham
+	Label.Text = labelText
+	Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+	Label.TextSize = 14
+	Label.TextXAlignment = Enum.TextXAlignment.Left
+	Label.TextYAlignment = Enum.TextYAlignment.Bottom
+	Label.Parent = Container
+
+	local DisplayButton = Instance.new("TextButton")
+	DisplayButton.Name = "DisplayButton"
+	DisplayButton.Size = UDim2.new(1, 0, 0, dropdownBaseHeight)
+	DisplayButton.Position = UDim2.new(0, 0, 0, labelHeight)
+	DisplayButton.BackgroundColor3 = config.Color or Color3.fromRGB(55, 55, 55)
+	DisplayButton.Font = Enum.Font.GothamSemibold
+	DisplayButton.Text = selectedOptionText .. " ▼"
+	DisplayButton.TextColor3 = Color3.fromRGB(210, 210, 210)
+	DisplayButton.TextSize = 14
+	DisplayButton.TextXAlignment = Enum.TextXAlignment.Left
+	DisplayButton.Parent = Container
+	local DisplayCorner = Instance.new("UICorner", DisplayButton)
+	DisplayCorner.CornerRadius = UDim.new(0, 6)
+	local DisplayPadding = Instance.new("UIPadding", DisplayButton)
+	DisplayPadding.PaddingLeft = UDim.new(0, 8)
+	DisplayPadding.PaddingRight = UDim.new(0, 8)
+
+	local OptionsFrame = Instance.new("ScrollingFrame")
+	OptionsFrame.Name = "OptionsFrame"
+	OptionsFrame.Size = UDim2.new(1, 0, 0, 0) -- Calculated later
+	OptionsFrame.Position = UDim2.new(0, 0, 1, 2) -- Below display button
+	OptionsFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	OptionsFrame.BorderSizePixel = 1
+	OptionsFrame.BorderColor3 = Color3.fromRGB(70, 70, 70)
+	OptionsFrame.Visible = false
+	OptionsFrame.ClipsDescendants = true
+	OptionsFrame.Parent = Container -- Parent to container
+	OptionsFrame.ZIndex = ZINDEX_COUNTER * 10 -- Higher ZIndex
+	OptionsFrame.ScrollBarThickness = 5
+	OptionsFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+	OptionsFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+	local OptionsCorner = Instance.new("UICorner", OptionsFrame)
+	OptionsCorner.CornerRadius = UDim.new(0, 6)
+	local OptionsLayout = Instance.new("UIListLayout", OptionsFrame)
+	OptionsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	OptionsLayout.Padding = UDim.new(0, 2)
+	local OptionsPadding = Instance.new("UIPadding", OptionsFrame)
+	OptionsPadding.PaddingTop = UDim.new(0, 4)
+	OptionsPadding.PaddingBottom = UDim.new(0, 4)
+	OptionsPadding.PaddingLeft = UDim.new(0, 4)
+	OptionsPadding.PaddingRight = UDim.new(0, 4)
+
+	local currentDismissButton = nil
+	local currentDismissConn = nil
+
+	local function closeDropdown(triggerCallback, newIndex, newText)
+		if not isOpen then return end
+
+		local oldIndex = selectedIndex
+		selectedIndex = newIndex or selectedIndex
+		selectedOptionText = newText or selectedOptionText
+		DisplayButton.Text = selectedOptionText .. " ▼"
+		isOpen = false
+		OptionsFrame.Visible = false
+		Container.ZIndex = ZINDEX_COUNTER * 2 -- Reset ZIndex
+		Container.ClipsDescendants = false -- Allow potential overflow again
+
+		if currentDismissButton and currentDismissButton.Parent then
+			currentDismissButton:Destroy()
+			currentDismissButton = nil
+		end
+		if currentDismissConn then
+			currentDismissConn:Disconnect()
+			currentDismissConn = nil
+		end
+
+		if triggerCallback and selectedIndex ~= oldIndex then -- Only trigger if selection changed
+			 task.spawn(callback, selectedOptionText)
+		end
+	end
+
+	local function selectOption(index, optionText)
+		closeDropdown(true, index, optionText) -- Close and trigger callback if index changed
+	end
+
+	local function buildOptions()
+		for _, child in ipairs(OptionsFrame:GetChildren()) do
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+		end
+
+		for index, optionText in ipairs(options) do
+			local OptionButton = Instance.new("TextButton")
+			OptionButton.Name = "Option_" .. index
+			OptionButton.Size = UDim2.new(1, -OptionsPadding.PaddingLeft.Offset - OptionsPadding.PaddingRight.Offset, 0, optionHeight) -- Adjust width for padding
+			OptionButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+			OptionButton.BackgroundTransparency = 0.5
+			OptionButton.BorderSizePixel = 0
+			OptionButton.Font = Enum.Font.Gotham
+			OptionButton.Text = optionText
+			OptionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+			OptionButton.TextSize = 14
+			OptionButton.LayoutOrder = index
+            OptionButton.AutoButtonColor = false
+			OptionButton.Parent = OptionsFrame
+
+			OptionButton.MouseEnter:Connect(function() TweenService:Create(OptionButton, TweenInfo.new(0.1), {BackgroundTransparency = 0.2}):Play() end)
+			OptionButton.MouseLeave:Connect(function() TweenService:Create(OptionButton, TweenInfo.new(0.1), {BackgroundTransparency = 0.5}):Play() end)
+
+			OptionButton.MouseButton1Click:Connect(function()
+				selectOption(index, optionText)
+			end)
+		end
+
+		local totalContentHeight = (#options * optionHeight) + math.max(0, #options - 1) * OptionsLayout.Padding.Offset + OptionsPadding.PaddingTop.Offset + OptionsPadding.PaddingBottom.Offset
+		local optionsFrameVisibleHeight = math.min(totalContentHeight, optionsVisibleHeight)
+		OptionsFrame.Size = UDim2.new(1, 0, 0, optionsFrameVisibleHeight)
+		OptionsFrame.CanvasSize = UDim2.new(0, 0, 0, totalContentHeight)
+	end
+
+	DisplayButton.MouseButton1Click:Connect(function()
+		if isOpen then
+			closeDropdown(false)
+		else
+			-- Open
+			isOpen = true
+			OptionsFrame.Visible = true
+			DisplayButton.Text = selectedOptionText .. " ▲"
+			Container.ZIndex = ZINDEX_COUNTER * 11 -- Bring container to front
+			Container.ClipsDescendants = true -- Clip options frame
+
+			if currentDismissButton and currentDismissButton.Parent then currentDismissButton:Destroy() end
+			if currentDismissConn then currentDismissConn:Disconnect() end
+
+			currentDismissButton = Instance.new("TextButton")
+			currentDismissButton.Name = "HydraDismissDropdown"
+			currentDismissButton.Size = UDim2.new(1, 0, 1, 0)
+			currentDismissButton.Position = UDim2.new(0,0,0,0)
+			currentDismissButton.BackgroundTransparency = 1
+			currentDismissButton.Text = ""
+			currentDismissButton.ZIndex = ZINDEX_COUNTER * 9 -- Below options
+			currentDismissButton.Parent = screenGuiRef
+
+			currentDismissConn = currentDismissButton.MouseButton1Click:Connect(function()
+				local mousePos = UserInputService:GetMouseLocation()
+				RunService.Heartbeat:Wait()
+
+				local optionsAbsPos = OptionsFrame.AbsolutePosition
+				local optionsAbsSize = OptionsFrame.AbsoluteSize
+                local displayAbsPos = DisplayButton.AbsolutePosition
+				local displayAbsSize = DisplayButton.AbsoluteSize
+
+				local isOverOptions = optionsAbsSize.X > 0 and optionsAbsSize.Y > 0 and -- Ensure visible
+                                     mousePos.X >= optionsAbsPos.X and mousePos.X <= optionsAbsPos.X + optionsAbsSize.X and
+                                     mousePos.Y >= optionsAbsPos.Y and mousePos.Y <= optionsAbsPos.Y + optionsAbsSize.Y
+
+				local isOverDisplay = mousePos.X >= displayAbsPos.X and mousePos.X <= displayAbsPos.X + displayAbsSize.X and
+									  mousePos.Y >= displayAbsPos.Y and mousePos.Y <= displayAbsPos.Y + displayAbsSize.Y
+
+				if not isOverOptions and not isOverDisplay then
+					closeDropdown(false) -- Clicked outside
+				end
+			end)
+		end
+	end)
+
+	buildOptions() -- Initial population
+
+	local function setter(optionValue)
+		local found = false
+        local previousIndex = selectedIndex
+		for i, v in ipairs(options) do
+			if v == optionValue then
+				selectedIndex = i
+				selectedOptionText = v
+				DisplayButton.Text = selectedOptionText .. (isOpen and " ▲" or " ▼")
+				found = true
+				break
+			end
+		end
+		-- Programmatic set does NOT trigger callback
+		return found
+	end
+
+	local function refresher(newOptions, clearCurrentSelection)
+        local previousValue = selectedOptionText
+		options = newOptions or {}
+		if clearCurrentSelection or selectedIndex > #options then
+			selectedIndex = 1
+		end
+		selectedOptionText = options[selectedIndex] or "Select..."
+		DisplayButton.Text = selectedOptionText .. (isOpen and " ▲" or " ▼")
+		buildOptions()
+        -- Programmatic refresh does NOT trigger callback even if selection changes
+	end
+
+	return Container, setter, refresher
+end
+
+--==============================================================================--
+--                             LIBRARY MAIN METHODS                             --
+--==============================================================================--
+
+function HydraLib:MakeWindow(config)
+	config = config or {}
+	local window = {}
+	setmetatable(window, HydraLib)
+
+	window.Name = config.Name or "Hydra UI"
+	window.Size = config.Size or UDim2.new(0, 450, 0, 400)
+	window.Position = config.Position
+	window._tabs = {}
+	window._tabButtons = {}
+	window._contentPages = {}
+	window._activeTabName = nil
+	window._closeCallback = config.CloseCallback or function() end
+	window._nextLayoutOrder = 1
+
+	window._screenGui = Instance.new("ScreenGui", CoreGui)
+	window._screenGui.Name = "HydraLib_" .. window.Name:gsub("%s+", "")
+	window._screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	window._screenGui.ResetOnSpawn = false
+	table.insert(HydraLib._windows, window)
+	ZINDEX_COUNTER += 20
+
+	window._mainFrame = Instance.new("Frame")
+	window._mainFrame.Name = "MainWindow"
+	window._mainFrame.Size = window.Size
+	window._mainFrame.Position = window.Position or UDim2.new(0.5, -window.Size.X.Offset / 2, 0.5, -window.Size.Y.Offset / 2)
+	window._mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	window._mainFrame.BorderSizePixel = 0
+	window._mainFrame.ClipsDescendants = true
+	window._mainFrame.Active = true
+	window._mainFrame.Visible = true
+	window._mainFrame.Parent = window._screenGui
+	local mainCorner = Instance.new("UICorner", window._mainFrame)
+	mainCorner.CornerRadius = UDim.new(0, 12)
+
+	local titleBar = Instance.new("Frame")
+	titleBar.Name = "TitleBar"
+	titleBar.Size = UDim2.new(1, 0, 0, 30)
+	titleBar.Position = UDim2.new(0, 0, 0, 0)
+	titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	titleBar.BorderSizePixel = 0
+	titleBar.Active = true
+	titleBar.Parent = window._mainFrame
+	local titleCorner = Instance.new("UICorner", titleBar)
+	titleCorner.CornerRadius = UDim.new(0, 12)
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "TitleText"
+	titleLabel.Size = UDim2.new(1, -40, 1, 0)
+	titleLabel.Position = UDim2.new(0, 10, 0, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.Text = window.Name
+	titleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+	titleLabel.TextSize = 16
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.Parent = titleBar
+
+	local isDraggingWindow = false
+	local windowDragStart = nil
+	local windowStartPos = nil
+	local windowDragMoveConnection = nil
+	local windowDragReleaseConnection = nil
+	titleBar.InputBegan:Connect(function(input)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not isDraggingWindow then
+			isDraggingWindow = true
+			windowDragStart = input.Position
+			windowStartPos = window._mainFrame.Position
+			if windowDragMoveConnection then windowDragMoveConnection:Disconnect() end
+			if windowDragReleaseConnection then windowDragReleaseConnection:Disconnect() end
+			windowDragMoveConnection = UserInputService.InputChanged:Connect(function(moveInput)
+				if isDraggingWindow and (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) then
+					local delta = moveInput.Position - windowDragStart
+					window._mainFrame.Position = UDim2.new(windowStartPos.X.Scale, windowStartPos.X.Offset + delta.X, windowStartPos.Y.Scale, windowStartPos.Y.Offset + delta.Y)
+				end
+			end)
+			windowDragReleaseConnection = UserInputService.InputEnded:Connect(function(endInput)
+				if isDraggingWindow and (endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch) then
+					isDraggingWindow = false
+					if windowDragMoveConnection then windowDragMoveConnection:Disconnect(); windowDragMoveConnection = nil end
+					if windowDragReleaseConnection then windowDragReleaseConnection:Disconnect(); windowDragReleaseConnection = nil end
+				end
+			end)
+		end
+	end)
+
+	local closeButton = Instance.new("TextButton")
+	closeButton.Name = "CloseButton"
+	closeButton.Size = UDim2.new(0, 20, 0, 20)
+	closeButton.Position = UDim2.new(1, -25, 0.5, -10)
+	closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	closeButton.BorderSizePixel = 0
+	closeButton.Font = Enum.Font.SourceSansBold
+	closeButton.Text = "X"
+	closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeButton.TextSize = 14
+    closeButton.AutoButtonColor = false
+	closeButton.Parent = titleBar
+	local closeCorner = Instance.new("UICorner", closeButton)
+	closeCorner.CornerRadius = UDim.new(0, 4)
+	closeButton.MouseButton1Click:Connect(function()
+		window:Destroy()
+	end)
+
+	window._tabContainer = Instance.new("Frame")
+	window._tabContainer.Name = "TabContainer"
+	window._tabContainer.Size = UDim2.new(1, 0, 0, 35)
+	window._tabContainer.Position = UDim2.new(0, 0, 0, titleBar.Size.Y.Offset)
+	window._tabContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	window._tabContainer.BorderSizePixel = 0
+	window._tabContainer.Parent = window._mainFrame
+	local tabListLayout = Instance.new("UIListLayout", window._tabContainer)
+	tabListLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tabListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	tabListLayout.Padding = UDim.new(0, 5)
+	local tabPadding = Instance.new("UIPadding", window._tabContainer)
+	tabPadding.PaddingLeft = UDim.new(0, 5)
+	tabPadding.PaddingRight = UDim.new(0, 5)
+
+	window._contentContainer = Instance.new("Frame")
+	window._contentContainer.Name = "ContentContainer"
+	window._contentContainer.Size = UDim2.new(1, -10, 1, -(titleBar.Size.Y.Offset + window._tabContainer.Size.Y.Offset + 5))
+	window._contentContainer.Position = UDim2.new(0, 5, 0, titleBar.Size.Y.Offset + window._tabContainer.Size.Y.Offset)
+	window._contentContainer.BackgroundTransparency = 1
+	window._contentContainer.BorderSizePixel = 0
+	window._contentContainer.ClipsDescendants = true
+	window._contentContainer.Parent = window._mainFrame
+
+	function window:_switchTab(targetTabName)
+		if window._activeTabName == targetTabName then return end
+		window._activeTabName = targetTabName
+		for tabName, button in pairs(window._tabButtons) do
+			local isActive = (tabName == targetTabName)
+			local targetColor = isActive and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(55, 55, 55)
+			local targetTextColor = isActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
+			TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+            local textLabel = button:FindFirstChild("TextLabel")
+            if textLabel then
+			    TweenService:Create(textLabel, TweenInfo.new(0.2), {TextColor3 = targetTextColor}):Play()
+            end
+			if window._contentPages[tabName] then
+				 window._contentPages[tabName].Visible = isActive
+			end
+		end
+	end
+
+	return window
+end
+
+function HydraLib:MakeTab(config)
+	config = config or {}
+	local window = self
+	if not window or not window._mainFrame then
+		error("MakeTab must be called on a Window object created by MakeWindow.")
+		return
+	end
+
+	local tab = {}
+	tab.Name = config.Name or "Tab" .. (#window._tabs + 1)
+	tab._window = window
+	tab._layoutOrderCounter = 1
+
+	local tabButton = Instance.new("TextButton")
+	tabButton.Name = tab.Name .. "TabButton"
+	tabButton.Size = UDim2.new(0, 100, 0, 25)
+	tabButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+	tabButton.BorderSizePixel = 0
+	tabButton.LayoutOrder = #window._tabs + 1
+	tabButton.Parent = window._tabContainer
+	tabButton.AutoButtonColor = false
+	local tabCorner = Instance.new("UICorner", tabButton)
+	tabCorner.CornerRadius = UDim.new(0, 6)
+
+	local tabTextLabel = Instance.new("TextLabel", tabButton)
+	tabTextLabel.Name = "TextLabel"
+	tabTextLabel.Size = UDim2.new(1, 0, 1, 0)
+	tabTextLabel.BackgroundTransparency = 1
+	tabTextLabel.Text = tab.Name
+	tabTextLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+	tabTextLabel.Font = Enum.Font.GothamSemibold
+	tabTextLabel.TextSize = 14
+
+	window._tabButtons[tab.Name] = tabButton
+
+	tab._contentPage = Instance.new("ScrollingFrame")
+	tab._contentPage.Name = tab.Name .. "ContentPage"
+	tab._contentPage.Size = UDim2.new(1, 0, 1, 0)
+	tab._contentPage.Position = UDim2.new(0, 0, 0, 0)
+	tab._contentPage.BackgroundTransparency = 1
+	tab._contentPage.BorderSizePixel = 0
+	tab._contentPage.Visible = false
+	tab._contentPage.ClipsDescendants = true
+	tab._contentPage.Parent = window._contentContainer
+	tab._contentPage.CanvasSize = UDim2.new(0, 0, 0, 0) -- AutoSize Y handles this
+	tab._contentPage.ScrollBarThickness = 6
+	tab._contentPage.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+	tab._contentPage.ScrollingDirection = Enum.ScrollingDirection.Y
+	tab._contentPage.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Let layout handle height
+	tab._contentPage.CanvasPosition = Vector2.new()
+
+	local contentPadding = Instance.new("UIPadding", tab._contentPage)
+	contentPadding.PaddingTop = UDim.new(0, 10)
+	contentPadding.PaddingBottom = UDim.new(0, 10)
+	contentPadding.PaddingLeft = UDim.new(0, 10)
+	contentPadding.PaddingRight = UDim.new(0, 10)
+
+	tab._contentLayout = Instance.new("UIListLayout", tab._contentPage)
+	tab._contentLayout.Padding = UDim.new(0, 15)
+	tab._contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tab._contentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+	window._contentPages[tab.Name] = tab._contentPage
+	table.insert(window._tabs, tab)
+
+	-- ================================================== --
+	-- DEFINE ELEMENT ADDER METHODS DIRECTLY ON THIS TAB  --
+    -- ================================================== --
+    tab.AddSlider = function(self, sliderConfig) -- 'self' here IS the tab object
+        if not self or not self._contentPage then error("Internal error: AddSlider called on invalid object.") end
+        sliderConfig = sliderConfig or {}
+        sliderConfig._LayoutOrder = self._layoutOrderCounter
+        self._layoutOrderCounter = self._layoutOrderCounter + 1
+        local element, setter = _createSlider(self._contentPage, sliderConfig)
+        return { Type = "Slider", Element = element, Set = setter }
+    end
+
+    tab.AddToggle = function(self, toggleConfig)
+        if not self or not self._contentPage then error("Internal error: AddToggle called on invalid object.") end
+        toggleConfig = toggleConfig or {}
+        toggleConfig._LayoutOrder = self._layoutOrderCounter
+        self._layoutOrderCounter = self._layoutOrderCounter + 1
+        local element, setter = _createToggle(self._contentPage, toggleConfig)
+        return { Type = "Toggle", Element = element, Set = setter }
+    end
+
+    tab.AddDropdown = function(self, dropdownConfig)
+        if not self or not self._contentPage then error("Internal error: AddDropdown called on invalid object.") end
+        dropdownConfig = dropdownConfig or {}
+        dropdownConfig._LayoutOrder = self._layoutOrderCounter
+        self._layoutOrderCounter = self._layoutOrderCounter + 1
+        local element, setter, refresher = _createDropdown(self._contentPage, dropdownConfig, self._window._screenGui)
+        return { Type = "Dropdown", Element = element, Set = setter, Refresh = refresher }
+    end
+    -- ================================================== --
+
+	tabButton.MouseButton1Click:Connect(function()
+		window:_switchTab(tab.Name)
+	end)
+
+	if #window._tabs == 1 then
+		task.defer(window._switchTab, window, tab.Name)
+	end
+
+	return tab
+end
+
+
+--==============================================================================--
+--                             LIBRARY UTILITIES                                --
+--==============================================================================--
+
+function HydraLib:Destroy()
+	if self == HydraLib then
+		for i = #HydraLib._windows, 1, -1 do
+			local window = HydraLib._windows[i]
+			if window and window.Destroy then
+				window:Destroy()
+			end
+			table.remove(HydraLib._windows, i)
+		end
+		ZINDEX_COUNTER = 1
+	else
+		local window = self
+		if window and window._screenGui and window._screenGui.Parent then
+            pcall(window._closeCallback) -- Safely call user callback
+			window._screenGui:Destroy()
+			for i, w in ipairs(HydraLib._windows) do
+				if w == window then
+					table.remove(HydraLib._windows, i)
+					break
+				end
+			end
+		end
+	end
+end
+
+-- Expose the main library object
+return HydraLib
