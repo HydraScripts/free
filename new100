@@ -1,0 +1,346 @@
+--- START OF FIXED REVAMPED FILE V3 ---
+
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+local OrionLib = {
+	Elements = {},
+	ThemeObjects = {},
+	Connections = {},
+	Flags = {},
+	Themes = {
+		Default = {
+			Main = Color3.fromRGB(25, 25, 25),
+			Second = Color3.fromRGB(32, 32, 32),
+			Stroke = Color3.fromRGB(60, 60, 60),
+			Divider = Color3.fromRGB(60, 60, 60),
+			Text = Color3.fromRGB(240, 240, 240),
+			TextDark = Color3.fromRGB(150, 150, 150),
+			Accent = Color3.fromRGB(9, 149, 98),
+			AccentContrast = Color3.fromRGB(255, 255, 255),
+		},
+		Modern = {
+			Main = Color3.fromRGB(30, 32, 36),
+			Second = Color3.fromRGB(40, 42, 48),
+			Stroke = Color3.fromRGB(65, 68, 74),
+			Divider = Color3.fromRGB(50, 52, 58),
+			Text = Color3.fromRGB(235, 235, 240),
+			TextDark = Color3.fromRGB(160, 165, 175),
+			Accent = Color3.fromRGB(88, 101, 242),
+			AccentContrast = Color3.fromRGB(255, 255, 255),
+		}
+	},
+	SelectedTheme = "Modern",
+	Folder = nil,
+	SaveCfg = false,
+	Debug = true -- Keep Debug enabled for now
+}
+
+-- Feather Icons Loader
+local Icons = {}
+local iconLoadSuccess, iconLoadResponse = pcall(function()
+	local responseBody = game:HttpGet("https://raw.githubusercontent.com/iconify/icon-sets/refs/heads/master/json/feather.json", true)
+	local decoded = HttpService:JSONDecode(responseBody)
+	if decoded and decoded.icons then
+		Icons = decoded.icons
+	else
+		warn("Orion Library - Feather Icons JSON format unexpected.")
+	end
+end)
+
+if not iconLoadSuccess then
+	warn("Orion Library - Failed to fetch Feather Icons. Error: " .. tostring(iconLoadResponse))
+elseif next(Icons) == nil then
+	warn("Orion Library - Feather Icons loaded but appear empty.")
+end
+
+local function GetIconSVG(IconName)
+    local iconData = Icons[IconName]
+	if iconData and iconData.body then
+		return string.format('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">%s</svg>', iconData.body)
+	else
+		if OrionLib.Debug then warn("Orion Library - Icon not found:", IconName) end
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>' -- Placeholder
+	end
+end
+
+-- Main ScreenGui Setup
+local Orion = Create("ScreenGui", {
+    Name = "Orion",
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    ResetOnSpawn = false,
+    DisplayOrder = 999,
+    Parent = CoreGui -- Parent immediately
+})
+
+-- Check if Orion ScreenGui was created successfully
+if not Orion then
+    warn("Orion Library FATAL: Could not create main ScreenGui. Library cannot initialize.")
+    -- Return an empty table or error to prevent script using the library from proceeding
+    return { MakeWindow = function() warn("Orion Library not initialized."); return nil end, Destroy = function() end }
+end
+
+-- Cleanup duplicate GUIs
+for _, Interface in ipairs(CoreGui:GetChildren()) do
+	if Interface:IsA("ScreenGui") and Interface.Name == Orion.Name and Interface ~= Orion then
+		Interface:Destroy()
+	end
+end
+
+-- Function to check if Orion is running
+function OrionLib:IsRunning()
+	return Orion and Orion.Parent == CoreGui and Orion.Archivable
+end
+
+-- Connection Management
+local function AddConnection(Signal, Function)
+	if not OrionLib:IsRunning() then return nil end
+	local WrappedFunction = function(...)
+		local success, err = pcall(Function, ...)
+		if not success then warn("Orion Library Error in connected function:", err, "\n", debug.traceback()) end
+	end
+	local Connection = Signal:Connect(WrappedFunction)
+	table.insert(OrionLib.Connections, Connection)
+	return Connection
+end
+
+-- Auto-disconnect connections
+AddConnection(Orion.AncestryChanged, function(_, parent)
+	if parent ~= CoreGui and OrionLib:IsRunning() then
+		if OrionLib.Debug then print("Orion Library: Instance destroyed or moved. Disconnecting events.") end
+		for i=#OrionLib.Connections, 1, -1 do
+			local Connection = OrionLib.Connections[i]
+			if Connection and Connection.Connected then Connection:Disconnect() end
+			table.remove(OrionLib.Connections, i)
+		end
+	end
+end)
+
+-- Dragging Functionality (Seems OK, keep as is)
+local function AddDraggingFunctionality(DragPoint, Main)
+	local Dragging, DragInput, MousePos, FramePos; local tween
+	AddConnection(DragPoint.InputBegan, function(Input) if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then Dragging = true; MousePos = Input.Position; FramePos = Main.Position; if tween and tween.PlaybackState == Enum.PlaybackState.Playing then tween:Cancel() end; local focused = UserInputService:GetFocusedTextBox(); if focused then focused:ReleaseFocus(false) end; local icConn; icConn = AddConnection(Input.Changed, function() if Input.UserInputState == Enum.UserInputState.End then Dragging = false; if icConn and icConn.Connected then icConn:Disconnect() end end end) end end)
+	AddConnection(DragPoint.InputChanged, function(Input) if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then DragInput = Input end end)
+	AddConnection(UserInputService.InputChanged, function(Input) if Input == DragInput and Dragging then local Delta = Input.Position - MousePos; local NewPos = UDim2.new(FramePos.X.Scale, FramePos.X.Offset + Delta.X, FramePos.Y.Scale, FramePos.Y.Offset + Delta.Y); tween = TweenService:Create(Main, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = NewPos }); tween:Play() end end)
+end
+
+-- Instance Creation Helper << Enhanced Logging >>
+local function Create(Name, Properties, Children)
+	local Object, err = pcall(Instance.new, Name)
+	if not Object then
+		warn("Orion Library - Error creating instance: ", Name, " - ", err)
+		return nil
+	end
+	-- Set Name first if provided, helps debugging
+	if Properties and Properties.Name then
+		Object.Name = Properties.Name
+	end
+	for Property, Value in pairs(Properties or {}) do
+		if Property ~= "Name" then -- Skip Name as it's set above
+			local success, setErr = pcall(function() Object[Property] = Value end)
+			if not success then
+				warn(string.format("Orion Library - Error setting property '%s' on new %s (%s): %s (Value Type: %s)",
+				     Property, Name, Object.Name or "-", tostring(setErr), typeof(Value)))
+			end
+		end
+	end
+	for _, Child in ipairs(Children or {}) do
+		if Child and typeof(Child) == "Instance" then -- Check child is valid instance
+			local success, parentErr = pcall(function() Child.Parent = Object end)
+			if not success then warn("Orion Library - Error parenting ", (Child.Name or Child.ClassName), " to new ", Name, ": ", parentErr) end
+        elseif OrionLib.Debug then
+            warn("Orion Library - Create: Skipping invalid child for ", Name, ": ", Child, " (Type: ", typeof(Child), ")")
+		end
+	end
+	return Object
+end
+
+-- Element Creation/Management
+local function CreateElement(ElementName, ElementFunction)
+	OrionLib.Elements[ElementName] = function(...)
+		local success, result = pcall(ElementFunction, ...)
+		if not success then
+			warn("Orion Library - Error executing element function for '", ElementName, "': ", result)
+			return nil
+		end
+        -- Ensure function returns an instance or nil
+		if result ~= nil and typeof(result) ~= "Instance" then
+            warn("Orion Library - Element function for '", ElementName, "' returned invalid type: ", typeof(result))
+            return nil
+        end
+		return result
+	end
+end
+
+local function MakeElement(ElementName, ...)
+	local ElementFunc = OrionLib.Elements[ElementName]
+	if not ElementFunc then
+		warn("Orion Library - Element type not found: ", ElementName)
+		return nil
+	end
+	local element = ElementFunc(...) -- pcall wrapper is inside CreateElement
+    -- Double check the return value here too
+    if element ~= nil and typeof(element) ~= "Instance" then
+        warn("Orion Library - MakeElement for '", ElementName, "' resulted in invalid type: ", typeof(element))
+        return nil
+    end
+	return element
+end
+
+-- Property/Children Setting Helpers << Keep V2 Guards >>
+local function SetProps(Element, Props)
+	if not Element or typeof(Element) ~= "Instance" then if OrionLib.Debug then warn("Orion Library - SetProps called with invalid Element:", Element, "(Type:", typeof(Element), ")") end; return nil end
+	for Property, Value in pairs(Props or {}) do
+		local success, setErr = pcall(function() Element[Property] = Value end)
+		if not success then warn("Orion Library - Error setting property '", Property, "' on existing ", Element.ClassName, " (", Element.Name, "): ", setErr) end
+	end
+	return Element
+end
+local function SetChildren(Element, Children)
+	if not Element or typeof(Element) ~= "Instance" then if OrionLib.Debug then warn("Orion Library - SetChildren called with invalid Element:", Element, "(Type:", typeof(Element), ")") end; return nil end
+	for _, Child in ipairs(Children or {}) do
+		if Child and typeof(Child) == "Instance" then
+			local success, parentErr = pcall(function() Child.Parent = Element end)
+			if not success then warn("Orion Library - Error parenting child to existing", Element.ClassName, ":", parentErr) end
+        elseif OrionLib.Debug then warn("Orion Library - SetChildren called with invalid Child:", Child, "(Type:", typeof(Child), ")") end
+	end
+	return Element
+end
+
+-- Rounding Helper (Keep as is)
+local function Round(Number, Factor) if Factor == 0 then return Number end; return math.floor(Number / Factor + 0.5) * Factor end
+
+-- Theming Helpers (Keep as is)
+local function GetThemeColor(Type) local theme = OrionLib.Themes[OrionLib.SelectedTheme]; if theme and theme[Type] then return theme[Type] end; theme = OrionLib.Themes["Default"]; if theme and theme[Type] then return theme[Type] end; if OrionLib.Debug then warn("Orion Library - Theme color type not found:", Type) end; return Color3.fromRGB(255, 0, 255) end
+local function ReturnProperty(Object) local class = Object.ClassName; if class == "Frame" or class == "TextButton" or class == "TextBox" or class == "ImageButton" then return "BackgroundColor3" elseif class == "ScrollingFrame" then return "ScrollBarImageColor3" elseif class == "UIStroke" then return "Color" elseif class == "TextLabel" then return "TextColor3" elseif class == "ImageLabel" then return "ImageColor3" else return nil end end
+local function AddThemeObject(Object, ThemeType) if not Object or not ThemeType or typeof(Object) ~= "Instance" then return Object end; local Property = ReturnProperty(Object); if not Property then return Object end; if not OrionLib.ThemeObjects[ThemeType] then OrionLib.ThemeObjects[ThemeType] = {}; setmetatable(OrionLib.ThemeObjects[ThemeType], { __mode = "v" }) end; table.insert(OrionLib.ThemeObjects[ThemeType], Object); Object[Property] = GetThemeColor(ThemeType); return Object end
+local function CreateThemedElement(ElementType, Properties, Children, ThemeType) local Element = Create(ElementType, Properties, Children); if Element and ThemeType then AddThemeObject(Element, ThemeType) end; return Element end
+local function SetTheme() local CurrentTheme = OrionLib.Themes[OrionLib.SelectedTheme]; if not CurrentTheme then warn("Orion Library - Selected theme not found:", OrionLib.SelectedTheme); return end; local tweenInfo = TweenInfo.new(0.2); for ThemeType, Objects in pairs(OrionLib.ThemeObjects) do local Color = CurrentTheme[ThemeType]; if Color then for i = #Objects, 1, -1 do local Object = Objects[i]; if Object and Object.Parent then local Property = ReturnProperty(Object); if Property then pcall(function() TweenService:Create(Object, tweenInfo, { [Property] = Color }):Play() end) end elseif Object == nil then table.remove(Objects, i) end end else if OrionLib.Debug then warn("Orion Library - Theme color type not found in selected theme:", ThemeType) end end end; if OrionLib.Debug then print("Orion Library: Theme applied -", OrionLib.SelectedTheme) end end
+
+-- Configuration Management (Keep as is)
+local function PackColor(Color) return { R = math.floor(Color.R * 255 + 0.5), G = math.floor(Color.G * 255 + 0.5), B = math.floor(Color.B * 255 + 0.5) } end
+local function UnpackColor(ColorTable) if ColorTable and type(ColorTable) == "table" and ColorTable.R then return Color3.fromRGB(ColorTable.R or 0, ColorTable.G or 0, ColorTable.B or 0) end return Color3.fromRGB(255, 255, 255) end
+local function LoadCfg(ConfigString) local Success, Data = pcall(HttpService.JSONDecode, HttpService, ConfigString); if not Success or type(Data) ~= "table" then warn("Orion Library Config Loader - Failed to decode JSON or data is not a table:", tostring(Data)); return end; local LoadedCount = 0; for FlagName, SavedValue in pairs(Data) do local Flag = OrionLib.Flags[FlagName]; if Flag and Flag.Set then task.spawn(function() local ValueToSet = SavedValue; if Flag.Type == "Colorpicker" then ValueToSet = UnpackColor(SavedValue) elseif Flag.Type == "Bind" then local keyEnum = Enum.KeyCode[tostring(SavedValue)]; local inputEnum = Enum.UserInputType[tostring(SavedValue)]; ValueToSet = keyEnum or inputEnum or Enum.KeyCode.Unknown end; local SetSuccess, SetError = pcall(Flag.Set, Flag, ValueToSet, true); if SetSuccess then LoadedCount = LoadedCount + 1 else warn("Orion Library Config Loader - Error setting flag", FlagName, ":", SetError) end end) elseif OrionLib.Debug then warn("Orion Library Config Loader - Could not find flag or Set method for:", FlagName) end end; if OrionLib.Debug then print("Orion Library: Loaded", LoadedCount, "flags.") end end
+local function SaveCfg(Name) if not OrionLib.SaveCfg then return end; local Data = {}; local SavedCount = 0; for FlagName, Flag in pairs(OrionLib.Flags) do if Flag.Save then local ValueToSave = Flag.Value; if Flag.Type == "Colorpicker" then ValueToSave = PackColor(Flag.Value) elseif Flag.Type == "Bind" then ValueToSave = tostring(Flag.Value.Name) end; Data[FlagName] = ValueToSave; SavedCount = SavedCount + 1 end end; if SavedCount == 0 then if OrionLib.Debug then print("Orion Library: No flags marked for saving.") end; return end; local JsonString; local JsonSuccess, Result = pcall(HttpService.JSONEncode, HttpService, Data); if JsonSuccess then JsonString = Result else warn("Orion Library Config Saver - Failed to encode JSON:", Result); return end; local FullPath = OrionLib.Folder .. "/" .. Name .. ".json"; local WriteSuccess, WriteError = pcall(writefile, FullPath, JsonString); if not WriteSuccess then warn("Orion Library Config Saver - Failed to write file:", FullPath, "-", WriteError) else if OrionLib.Debug then print("Orion Library: Saved", SavedCount, "flags to", FullPath) end end end
+
+-- Input Validation Constants (Keep as is)
+local WhitelistedMouse = { Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2, Enum.UserInputType.MouseButton3 }; local BlacklistedKeysForBinding = { Enum.KeyCode.Unknown, Enum.KeyCode.Escape, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift, Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl, Enum.KeyCode.LeftAlt, Enum.KeyCode.RightAlt, Enum.KeyCode.LeftSuper, Enum.KeyCode.RightSuper, Enum.KeyCode.Menu, Enum.KeyCode.Tab, Enum.KeyCode.CapsLock, Enum.KeyCode.NumLock, Enum.KeyCode.ScrollLock, Enum.KeyCode.Print, Enum.KeyCode.Pause, Enum.KeyCode.Insert, Enum.KeyCode.Home, Enum.KeyCode.End, Enum.KeyCode.PageUp, Enum.KeyCode.PageDown }; local function CheckKey(Table, Key) for _, Value in ipairs(Table) do if Value == Key then return true end end return false end
+
+--[[ Core Element Creation Functions - Definitions only ]]--
+--<< Ensure these functions return nil on failure >>
+CreateElement("Corner", function(Scale, Offset) return Create("UICorner", { CornerRadius = UDim.new(Scale or 0, Offset or 6) }) end)
+CreateElement("Stroke", function(Thickness, ThemeType) return CreateThemedElement("UIStroke", { Thickness = Thickness or 1, LineJoinMode = Enum.LineJoinMode.Round, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, nil, ThemeType or "Stroke") end)
+CreateElement("List", function(PaddingScale, PaddingOffset, VerticalAlign, HorizontalAlign, SortOrder) return Create("UIListLayout", { SortOrder = SortOrder or Enum.SortOrder.LayoutOrder, Padding = UDim.new(PaddingScale or 0, PaddingOffset or 5), VerticalAlignment = VerticalAlign or Enum.VerticalAlignment.Top, HorizontalAlignment = HorizontalAlign or Enum.HorizontalAlignment.Left, }) end)
+CreateElement("Padding", function(Bottom, Left, Right, Top) return Create("UIPadding", { PaddingBottom = UDim.new(0, Bottom or 6), PaddingLeft = UDim.new(0, Left or 6), PaddingRight = UDim.new(0, Right or 6), PaddingTop = UDim.new(0, Top or 6) }) end)
+CreateElement("TFrame", function() return Create("Frame", { Name = "TFrame", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }) end) -- Added name
+CreateElement("Frame", function(ThemeType) return CreateThemedElement("Frame", { BorderSizePixel = 0 }, nil, ThemeType or "Second") end)
+CreateElement("RoundFrame", function(ThemeType, CornerScale, CornerOffset) local children = {}; local corner = MakeElement("Corner", CornerScale, CornerOffset or 6); if corner then table.insert(children, corner) end; local Frame = CreateThemedElement("Frame", { BorderSizePixel = 0 }, children, ThemeType or "Second"); return Frame end)
+CreateElement("Button", function(ThemeType) return CreateThemedElement("TextButton", { Text = "", AutoButtonColor = false, BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), }, nil, ThemeType) end)
+CreateElement("ScrollFrame", function(ThemeType, ScrollbarWidth) return CreateThemedElement("ScrollingFrame", { BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = ScrollbarWidth or 6, CanvasSize = UDim2.new(0, 0, 0, 0), VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar, HorizontalScrollBarInset = Enum.ScrollBarInset.None, ElasticBehavior = Enum.ElasticBehavior.Never, }, nil, "Divider") end)
+CreateElement("Image", function(ImageID, ThemeType) local Img = CreateThemedElement("ImageLabel", { Image = "", BackgroundTransparency = 1, ScaleType = Enum.ScaleType.Fit, }, nil, ThemeType or "Text"); if not Img then return nil end; local DefaultColor = GetThemeColor(ThemeType or "Text"); if type(ImageID) == "string" and ImageID:match("^<svg") then Img.RichText = true; Img.Text = ImageID; Img.Image = ""; Img.TextScaled = true; Img.TextColor3 = DefaultColor; Img.TextStrokeTransparency = 1; Img.BackgroundTransparency = 1 elseif type(ImageID) == "string" and ImageID:match("^rbxassetid://") then Img.Image = ImageID; Img.ImageColor3 = DefaultColor; elseif type(ImageID) == "string" then local svgData = GetIconSVG(ImageID); Img.RichText = true; Img.Text = svgData; Img.Image = ""; Img.TextScaled = true; Img.TextColor3 = DefaultColor; Img.TextStrokeTransparency = 1; Img.BackgroundTransparency = 1 end; return Img end)
+CreateElement("ImageButton", function(ImageID, ThemeType) local Btn = CreateThemedElement("ImageButton", { Image = "", BackgroundTransparency = 1, ScaleType = Enum.ScaleType.Fit, AutoButtonColor = false, }, nil, ThemeType or "Text"); if not Btn then return nil end; local DefaultColor = GetThemeColor(ThemeType or "Text"); if type(ImageID) == "string" and ImageID:match("^<svg") then Btn.RichText = true; Btn.Text = ImageID; Btn.Image = ""; Btn.TextScaled = true; Btn.TextColor3 = DefaultColor; Btn.TextStrokeTransparency = 1; Btn.BackgroundTransparency = 1 elseif type(ImageID) == "string" and ImageID:match("^rbxassetid://") then Btn.Image = ImageID; elseif type(ImageID) == "string" then local svgData = GetIconSVG(ImageID); Btn.RichText = true; Btn.Text = svgData; Btn.Image = ""; Btn.TextScaled = true; Btn.TextColor3 = DefaultColor; Btn.TextStrokeTransparency = 1; Btn.BackgroundTransparency = 1 end; if Btn.Image ~= "" then Btn.ImageColor3 = DefaultColor end; return Btn end)
+CreateElement("Label", function(Text, TextSize, ThemeType, Font, Align) return CreateThemedElement("TextLabel", { Text = Text or "", TextSize = TextSize or 14, TextColor3 = GetThemeColor(ThemeType or "Text"), TextTransparency = 0, Font = Font or Enum.Font.GothamSemibold, RichText = true, BackgroundTransparency = 1, TextXAlignment = Align or Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center, }, nil, ThemeType or "Text") end)
+
+-- ApplyHoverClickEffects Helper (Keep V2)
+local function ApplyHoverClickEffects(GuiButton, TargetInstance, BaseThemeType, HoverBrightness, ClickBrightness) if not GuiButton or not TargetInstance or typeof(GuiButton) ~= "Instance" or typeof(TargetInstance) ~= "Instance" then return end; local BaseColor = GetThemeColor(BaseThemeType); local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out); local currentTween = nil; local HoverColor = Color3.fromRGB(math.min(255, BaseColor.R * 255 + (HoverBrightness or 10)), math.min(255, BaseColor.G * 255 + (HoverBrightness or 10)), math.min(255, BaseColor.B * 255 + (HoverBrightness or 10))); local ClickColor = Color3.fromRGB(math.min(255, BaseColor.R * 255 + (ClickBrightness or 15)), math.min(255, BaseColor.G * 255 + (ClickBrightness or 15)), math.min(255, BaseColor.B * 255 + (ClickBrightness or 15))); AddConnection(GuiButton.MouseEnter, function() if currentTween then currentTween:Cancel() end; currentTween = TweenService:Create(TargetInstance, tweenInfo, { BackgroundColor3 = HoverColor }); currentTween:Play() end); AddConnection(GuiButton.MouseLeave, function() if currentTween then currentTween:Cancel() end; currentTween = TweenService:Create(TargetInstance, tweenInfo, { BackgroundColor3 = BaseColor }); currentTween:Play() end); AddConnection(GuiButton.MouseButton1Down, function() if currentTween then currentTween:Cancel() end; currentTween = TweenService:Create(TargetInstance, tweenInfo, { BackgroundColor3 = ClickColor }); currentTween:Play() end); AddConnection(GuiButton.MouseButton1Up, function() if currentTween then currentTween:Cancel() end; local mouseLoc = UserInputService:GetMouseLocation(); local hovering = GuiButton.AbsolutePosition.X <= mouseLoc.X and mouseLoc.X <= GuiButton.AbsolutePosition.X + GuiButton.AbsoluteSize.X and GuiButton.AbsolutePosition.Y <= mouseLoc.Y and mouseLoc.Y <= GuiButton.AbsolutePosition.Y + GuiButton.AbsoluteSize.Y; local targetColor = hovering and HoverColor or BaseColor; currentTween = TweenService:Create(TargetInstance, tweenInfo, { BackgroundColor3 = targetColor }); currentTween:Play() end) end
+
+-- Notification System << Added Nil Check >>
+local NotificationHolderList = MakeElement("List", 0, 8, Enum.VerticalAlignment.Bottom, Enum.HorizontalAlignment.Right, Enum.SortOrder.LayoutOrder)
+local NotificationHolder = Create("Frame", { Name = "NotificationHolder", BackgroundTransparency = 1, Position = UDim2.new(1, -15, 1, -15), Size = UDim2.new(0, 320, 0.5, 0), AnchorPoint = Vector2.new(1, 1), Parent = Orion, ZIndex = 10000, }, { NotificationHolderList })
+
+if not NotificationHolder or not NotificationHolderList then
+    warn("Orion Library - Failed to create NotificationHolder setup.")
+    -- Define a dummy MakeNotification if setup failed
+    function OrionLib:MakeNotification() warn("Orion Library - Notification system failed to initialize.") end
+else
+    function OrionLib:MakeNotification(NotificationConfig) task.spawn(function() if not NotificationHolder or not NotificationHolder.Parent then warn("Orion Library - NotificationHolder is missing."); return end; local Name = NotificationConfig.Name or "Notification"; local Content = NotificationConfig.Content or "Notification content."; local Image = NotificationConfig.Image; local Time = NotificationConfig.Time or 5; local ThemeColor = NotificationConfig.ThemeColor or "Accent"; local NF = CreateThemedElement("RoundFrame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = NotificationHolder, ClipsDescendants = true, Position = UDim2.new(1, 20, 0, 0), BackgroundTransparency = 0.1, }, { MakeElement("Stroke", 1, "Stroke"), MakeElement("Padding", 8, 10, 10, 8), MakeElement("List", 0, 8, Enum.VerticalAlignment.Center, Enum.HorizontalAlignment.Left) }, "Second"); if not NF then return end; if Image then local IE = CreateThemedElement("ImageLabel", { Size = UDim2.fromOffset(24, 24), Image = Image, LayoutOrder = 1, Parent = NF, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0, 0.5), BackgroundTransparency = 1, }, nil, ThemeColor); if IE and IE.RichText then IE.TextYAlignment = Enum.TextYAlignment.Center end end; local TB = Create("Frame", { Size = UDim2.new(Image and 0.8 or 1, - (Image and 8 or 0), 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2, Parent = NF, }, { MakeElement("List", 0, 2) }); if not TB then NF:Destroy(); return end; CreateThemedElement("TextLabel", { Text = "<b>" .. Name .. "</b>", TextSize = 15, Size = UDim2.new(1, 0, 0, 18), Parent = TB, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, }, nil, "Text"); CreateThemedElement("TextLabel", { Text = Content, TextSize = 13, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, Parent = TB, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, }, nil, "TextDark"); local TII = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out); TweenService:Create(NF, TII, { Position = UDim2.new(0, 0, 0, 0) }):Play(); task.wait(Time); if not NF or not NF.Parent then return end; local TIO = TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.In); local FOT = TweenService:Create(NF, TIO, { BackgroundTransparency = 1 }); local SOT = TweenService:Create(NF, TIO, { Position = UDim2.new(-1, -20, 0, 0) }); for _, c in ipairs(NF:GetDescendants()) do if c:IsA("GuiObject") then local p = "BackgroundTransparency"; if c:IsA("TextLabel") or c:IsA("TextBox") then p = "TextTransparency" elseif c:IsA("ImageLabel") or c:IsA("ImageButton") then p = "ImageTransparency" elseif c:IsA("UIStroke") then p = "Transparency" end; if c[p] ~= nil then pcall(function() TweenService:Create(c, TweenInfo.new(0.3), { [p] = 1 }):Play() end) end end end; task.wait(0.2); if not NF or not NF.Parent then return end; FOT:Play(); SOT:Play(); task.spawn(function() FOT.Completed:Wait(); if NF and NF.Parent then NF:Destroy() end end) end) end
+end
+
+-- Initialization
+function OrionLib:Init()
+	--[[ Config loading code remains the same ]]--
+	if OrionLib.SaveCfg then if not isfolder(OrionLib.Folder) then local success, err = pcall(makefolder, OrionLib.Folder); if not success then warn("Orion Library: Failed to create config folder -", err) end end; local ConfigPath = OrionLib.Folder .. "/" .. tostring(game.GameId) .. ".json"; if isfile(ConfigPath) then local ReadSuccess, ConfigContent = pcall(readfile, ConfigPath); if ReadSuccess and ConfigContent then local LoadSuccess, LoadError = pcall(LoadCfg, ConfigContent); if LoadSuccess then OrionLib:MakeNotification({ Name = "Configuration Loaded", Content = "Settings loaded for Game ID: " .. game.GameId, Time = 4, ThemeColor = "Accent" }) else warn("Orion Library: Failed to load config -", LoadError); OrionLib:MakeNotification({ Name = "Config Error", Content = "Failed to parse configuration file.", Time = 5, ThemeColor = "Main" }) end elseif not ReadSuccess then warn("Orion Library: Failed to read config file -", ConfigContent) end end end
+	SetTheme()
+end
+
+-- Main Window Creation << Extensive Nil Checks Added >>
+function OrionLib:MakeWindow(WindowConfig)
+	WindowConfig = WindowConfig or {}; WindowConfig.Name = WindowConfig.Name or "Orion Library"; WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name:gsub("[^%w_]", "_"); WindowConfig.SaveConfig = WindowConfig.SaveConfig or false; WindowConfig.HidePremium = WindowConfig.HidePremium; WindowConfig.IntroEnabled = WindowConfig.IntroEnabled ~= false; WindowConfig.IntroText = WindowConfig.IntroText or WindowConfig.Name; WindowConfig.CloseCallback = WindowConfig.CloseCallback or function() end; WindowConfig.ShowIcon = WindowConfig.ShowIcon or false; WindowConfig.Icon = WindowConfig.Icon or "feather/hexagon"; WindowConfig.IntroIcon = WindowConfig.IntroIcon or WindowConfig.Icon
+	OrionLib.Folder = WindowConfig.ConfigFolder; OrionLib.SaveCfg = WindowConfig.SaveConfig
+	local FirstTab = true; local Minimized = false; local UIHidden = false
+
+	local MainWindow = MakeElement("RoundFrame", "Main", 0, 10)
+    if not MainWindow then warn("Orion Library: Failed to create MainWindow element!"); return nil end
+	SetProps(MainWindow, { Parent = Orion, Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.new(0, 650, 0, 400), ClipsDescendants = true, Visible = not WindowConfig.IntroEnabled, ZIndex = 1 })
+    local mainStroke = MakeElement("Stroke", 1.5); if mainStroke then mainStroke.Parent = MainWindow end
+
+	local TopBar = CreateThemedElement("Frame", { Name="TopBar", Size = UDim2.new(1, 0, 0, 45), Position = UDim2.fromScale(0, 0), Parent = MainWindow, ClipsDescendants = true, ZIndex = MainWindow.ZIndex + 1 }, { CreateThemedElement("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), AnchorPoint = Vector2.new(0, 1) }, nil, "Stroke") }, "Main")
+    if not TopBar then warn("Orion Library: Failed to create TopBar"); MainWindow:Destroy(); return nil end
+	local DragPoint = Create("Frame", { Name="DragPoint", Size = UDim2.new(1, -80, 1, 0), Position = UDim2.fromScale(0, 0), BackgroundTransparency = 1, Parent = TopBar, ZIndex = TopBar.ZIndex + 1 }); if not DragPoint then warn("Orion Library: Failed to create DragPoint"); MainWindow:Destroy(); return nil end
+	local WindowName = CreateThemedElement("TextLabel", { Name="WindowName", Text = "<b>" .. WindowConfig.Name .. "</b>", TextSize = 16, Font = Enum.Font.GothamBold, Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.new(0, WindowConfig.ShowIcon and 45 or 15, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Parent = TopBar, TextYAlignment = Enum.TextYAlignment.Center }, nil, "Text")
+	if WindowConfig.ShowIcon then local iconSize = 22; CreateThemedElement("ImageLabel", { Name="WindowIcon", Size = UDim2.fromOffset(iconSize, iconSize), Position = UDim2.new(0, 15, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Image = WindowConfig.Icon, Parent = TopBar, BackgroundTransparency = 1, }, nil, "Text") end
+	local TopBarButtons = CreateThemedElement("Frame", { Name="TopBarButtons", Size = UDim2.new(0, 70, 0, 28), Position = UDim2.new(1, -10, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Parent = TopBar, ZIndex = TopBar.ZIndex + 1, }, { MakeElement("List", 0, 5, Enum.VerticalAlignment.Center, Enum.HorizontalAlignment.Right), MakeElement("Stroke"), MakeElement("Corner") }, "Second"); if not TopBarButtons then warn("Orion Library: Failed to create TopBarButtons"); MainWindow:Destroy(); return nil end
+	local MinimizeBtnIcon = CreateThemedElement("ImageLabel", { Name = "Icon", Image = "feather/minus", Size = UDim2.fromScale(0.6, 0.6), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, }, nil, "Text")
+	local MinimizeBtn = CreateThemedElement("ImageButton", { Name="MinimizeBtn", Size = UDim2.new(0, 28, 1, 0), Image = "", LayoutOrder = 1, Parent = TopBarButtons, }, { MinimizeBtnIcon }, "Text")
+	local CloseBtn = CreateThemedElement("ImageButton", { Name="CloseBtn", Size = UDim2.new(0, 28, 1, 0), Image = "feather/x", LayoutOrder = 2, Parent = TopBarButtons, }, nil, "Text")
+    if not MinimizeBtn or not CloseBtn then warn("Orion Library: Failed to create Min/Close buttons"); MainWindow:Destroy(); return nil end
+	ApplyHoverClickEffects(MinimizeBtn, MinimizeBtn, "Second", 15, 25); ApplyHoverClickEffects(CloseBtn, CloseBtn, "Second", 15, 25)
+
+	local SideBar = CreateThemedElement("Frame", { Name="SideBar", Size = UDim2.new(0, 160, 1, -TopBar.Size.Y.Offset), Position = UDim2.new(0, 0, 0, TopBar.Size.Y.Offset), Parent = MainWindow, ZIndex = MainWindow.ZIndex + 1, }, { CreateThemedElement("Frame", { Size = UDim2.new(0, 1, 1, 0), Position = UDim2.fromScale(1, 0), AnchorPoint = Vector2.new(1, 0) }, nil, "Stroke") }, "Second"); if not SideBar then warn("Orion Library: Failed to create SideBar"); MainWindow:Destroy(); return nil end
+    local tabHolderList = MakeElement("List", 0, 0)
+    local tabHolderPadding = MakeElement("Padding", 8, 8, 8, 8)
+	local TabHolder = CreateThemedElement("ScrollingFrame", { Name="TabHolder", Size = UDim2.new(1, 0, 1, -50), Position = UDim2.fromScale(0, 0), Parent = SideBar, BackgroundTransparency = 1, CanvasSize = UDim2.fromScale(0, 0), ScrollBarThickness = 4, }, { tabHolderList, tabHolderPadding }, "Divider")
+    if not TabHolder or not tabHolderList or not tabHolderPadding then warn("Orion Library: Failed to create TabHolder"); MainWindow:Destroy(); return nil end
+	AddConnection(tabHolderList:GetPropertyChangedSignal("AbsoluteContentSize"), function() if TabHolder and TabHolder.Parent and tabHolderList and tabHolderPadding then TabHolder.CanvasSize = UDim2.new(0, tabHolderList.AbsoluteContentSize.X, 0, tabHolderList.AbsoluteContentSize.Y + tabHolderPadding.PaddingTop.Offset + tabHolderPadding.PaddingBottom.Offset) end end)
+	local ProfileArea = CreateThemedElement("Frame", { Name="ProfileArea", Size = UDim2.new(1, 0, 0, 50), Position = UDim2.fromScale(0, 1), AnchorPoint = Vector2.new(0, 1), Parent = SideBar, }, { CreateThemedElement("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.fromScale(0, 0) }, nil, "Stroke") }, "Second"); if not ProfileArea then warn("Orion Library: Failed to create ProfileArea"); MainWindow:Destroy(); return nil end
+	local ProfileContent = Create("Frame", { Name="ProfileContent", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = ProfileArea, },{ MakeElement("Padding", 5, 8, 8, 5) })
+	local PlayerIconFrame = CreateThemedElement("Frame", { Name="PlayerIcon", Size = UDim2.fromOffset(34, 34), Position = UDim2.new(0, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Parent = ProfileContent, }, { MakeElement("Corner", 1, 0), MakeElement("Stroke", 1, "Stroke"), Create("ImageLabel", { Name = "Headshot", Size = UDim2.fromScale(1, 1), Image = "https://www.roblox.com/headshot-thumbnail/image?userId=".. LocalPlayer.UserId .."&width=420&height=420&format=png", ScaleType = Enum.ScaleType.Crop, BackgroundTransparency = 1, }), }, "Second")
+	local playerInfoList = MakeElement("List", 0, 0, Enum.VerticalAlignment.Center)
+	local PlayerInfoFrame = Create("Frame", { Name="PlayerInfo", Size = UDim2.new(1, -48, 1, 0), Position = UDim2.new(0, 42, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundTransparency = 1, Parent = ProfileContent, ClipsDescendants = true, }, { playerInfoList })
+    if not playerInfoList or not PlayerInfoFrame then warn("Orion Library: Failed to create PlayerInfoFrame"); MainWindow:Destroy(); return nil end
+	CreateThemedElement("TextLabel", { Name="PlayerName", Text = LocalPlayer.DisplayName, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, 0, 0, 16), Parent = PlayerInfoFrame, TextTruncate = Enum.TextTruncate.AtEnd, }, nil, "Text")
+	if not WindowConfig.HidePremium then local statusText = "Standard"; if LocalPlayer.MembershipType == Enum.MembershipType.Premium then statusText = "Premium" end; CreateThemedElement("TextLabel", { Name="PlayerStatus", Text = statusText, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, 0, 0, 14), Parent = PlayerInfoFrame, TextTruncate = Enum.TextTruncate.AtEnd, }, nil, "TextDark") else playerInfoList.VerticalAlignment = Enum.VerticalAlignment.Center end
+	local ContentArea = Create("Frame", { Name="ContentArea", Size = UDim2.new(1, -SideBar.Size.X.Offset, 1, -TopBar.Size.Y.Offset), Position = UDim2.new(0, SideBar.Size.X.Offset, 0, TopBar.Size.Y.Offset), Parent = MainWindow, BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = MainWindow.ZIndex + 1, }); if not ContentArea then warn("Orion Library: Failed to create ContentArea"); MainWindow:Destroy(); return nil end
+
+	AddDraggingFunctionality(DragPoint, MainWindow)
+	--[[ Button Connections (Close, Minimize, RShift) - Keep V2 ]]--
+    AddConnection(CloseBtn.MouseButton1Click, function() if not MainWindow or not MainWindow.Parent then return end; local tween = TweenService:Create(MainWindow, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = MainWindow.Size - UDim2.fromOffset(50, 50), Position = MainWindow.Position + UDim2.fromOffset(25, 25), Transparency = 1}); tween:Play(); tween.Completed:Wait(); if MainWindow then MainWindow.Visible = false end; UIHidden = true; OrionLib:MakeNotification({ Name = "Interface Hidden", Content = "Press RightShift to reopen.", Time = 4 }); pcall(WindowConfig.CloseCallback) end)
+	AddConnection(UserInputService.InputBegan, function(Input, GameProcessed) if GameProcessed then return end; if Input.KeyCode == Enum.KeyCode.RightShift then if UIHidden then UIHidden = false; if not MainWindow or not MainWindow.Parent then return end; MainWindow.Visible = true; MainWindow.Transparency = 1; local tween = TweenService:Create(MainWindow, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.new(0, 650, 0, 400), Position = UDim2.new(0.5, 0, 0.5, 0), Transparency = 0}); tween:Play() elseif MainWindow and MainWindow.Visible then end end end)
+	AddConnection(MinimizeBtn.MouseButton1Click, function() Minimized = not Minimized; local minimizeIcon = MinimizeBtn:FindFirstChild("Icon"); if not MainWindow or not MainWindow.Parent then return end; if Minimized then MainWindow.ClipsDescendants = true; if minimizeIcon then minimizeIcon.Image = "feather/maximize-2" end; TweenService:Create(MainWindow, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(MainWindow.Size.X.Scale, MainWindow.Size.X.Offset, 0, TopBar.Size.Y.Offset) }):Play(); task.delay(0.1, function() if SideBar then SideBar.Visible = false end; if ContentArea then ContentArea.Visible = false end end) else if SideBar then SideBar.Visible = true end; if ContentArea then ContentArea.Visible = true end; if minimizeIcon then minimizeIcon.Image = "feather/minus" end; TweenService:Create(MainWindow, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(0, 650, 0, 400) }):Play(); task.delay(0.1, function() if MainWindow then MainWindow.ClipsDescendants = false end end) end end)
+	--[[ Intro Sequence (Keep V2) ]]--
+    local function LoadSequence() local IntroFrame = Create("Frame", { Size = UDim2.fromScale(1, 1), Position = UDim2.fromScale(0, 0), BackgroundTransparency = 1, Parent = Orion, ZIndex = 1000 }); if not IntroFrame then return end; local LogoSize = 48; local LoadSequenceLogo = CreateThemedElement("ImageLabel", { Parent = IntroFrame, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.45, 0), Size = UDim2.fromOffset(0, 0), Image = WindowConfig.IntroIcon, ImageTransparency = 1, BackgroundTransparency = 1, }, nil, "Accent"); local LoadSequenceText = CreateThemedElement("TextLabel", { Parent = IntroFrame, Size = UDim2.new(0.8, 0, 0, 30), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.55, 0), Text = WindowConfig.IntroText, TextSize = 18, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Center, TextTransparency = 1, }, nil, "Text"); if not LoadSequenceLogo or not LoadSequenceText then IntroFrame:Destroy(); return end; local tweenInfo1 = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out); local tweenInfo2 = TweenInfo.new(0.4, Enum.EasingStyle.Linear); TweenService:Create(LoadSequenceLogo, tweenInfo1, { ImageTransparency = 0, Size = UDim2.fromOffset(LogoSize, LogoSize) }):Play(); task.wait(0.1); TweenService:Create(LoadSequenceText, tweenInfo1, { TextTransparency = 0 }):Play(); task.wait(1.5); if not IntroFrame or not IntroFrame.Parent then return end; TweenService:Create(LoadSequenceLogo, tweenInfo2, { ImageTransparency = 1 }):Play(); TweenService:Create(LoadSequenceText, tweenInfo2, { TextTransparency = 1 }):Play(); task.wait(0.5); if IntroFrame and IntroFrame.Parent then IntroFrame:Destroy() end; if MainWindow and MainWindow.Parent then MainWindow.Visible = true; MainWindow.Transparency = 1; TweenService:Create(MainWindow, TweenInfo.new(0.3), {Transparency = 0}):Play() end end
+	if WindowConfig.IntroEnabled then task.spawn(LoadSequence) elseif MainWindow then MainWindow.Visible = true end -- Check MainWindow before setting visible
+
+	local TabFunction = {}
+	function TabFunction:MakeTab(TabConfig)
+        --[[ Tab creation logic + Element functions (Keep V2 - with internal nil checks) ]]--
+        -- Make sure all CreateThemedElement/MakeElement calls are checked for nil return
+        TabConfig=TabConfig or{};N=TabConfig.Name or"Tab";I=TabConfig.Icon or"feather/grid";P=TabConfig.PremiumOnly or false;PIsP=function()return false end;PHA=not P or(P and PIsP());TB=CreateThemedElement("TextButton",{Size=UDim2.new(1,0,0,40),Text="",AutoButtonColor=false,Parent=TabHolder,ClipsDescendants=true,Visible=PHA,LayoutOrder=#TabHolder:GetChildren()+1},{MakeElement("List",0,8,Enum.VerticalAlignment.Center,Enum.HorizontalAlignment.Left),MakeElement("Padding",0,12,0,12),CreateThemedElement("Frame",{Name="ActiveIndicator",Size=UDim2.new(0,3,0.7,0),Position=UDim2.fromScale(0,0.5),AnchorPoint=Vector2.new(0,0.5),BackgroundTransparency=1,Visible=false,ZIndex=3},{MakeElement("Corner",1,0)},"Accent")},"Second");if not TB then return nil end;TIE=CreateThemedElement("ImageLabel",{Size=UDim2.fromOffset(20,20),Image=I,LayoutOrder=1,Parent=TB,BackgroundTransparency=1},nil,"TextDark");TTE=CreateThemedElement("TextLabel",{Text=N,TextSize=14,Font=Enum.Font.GothamSemibold,LayoutOrder=2,Size=UDim2.new(1,-30,1,0),TextXAlignment=Enum.TextXAlignment.Left,Parent=TB,TextYAlignment=Enum.TextYAlignment.Center},nil,"TextDark");C=CreateThemedElement("ScrollingFrame",{Size=UDim2.fromScale(1,1),Position=UDim2.fromScale(0,0),Parent=ContentArea,Visible=false,Name="ItemContainer_"..N:gsub("%s+","_"),BackgroundTransparency=1,ZIndex=5},{MakeElement("List",0,8),MakeElement("Padding",15,15,15,15)},"Divider");if not C then TB:Destroy()return nil end;AddConnection(C.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"),function()if C and C.Parent and C.UIListLayout and C.UIPadding then C.CanvasSize=UDim2.new(0,0,0,C.UIListLayout.AbsoluteContentSize.Y+C.UIPadding.PaddingTop.Offset+C.UIPadding.PaddingBottom.Offset)end end);function STA(IA)if not TB or not TB.Parent then return end;TTC=IA and GetThemeColor("Text")or GetThemeColor("TextDark");TIC=IA and GetThemeColor("Accent")or GetThemeColor("TextDark");TF=IA and Enum.Font.GothamBold or Enum.Font.GothamSemibold;TInT=IA and 0 or 1;TBgC=IA and GetThemeColor("Main")or GetThemeColor("Second");TwI=TweenInfo.new(0.2,Enum.EasingStyle.Quad);Ind=TB:FindFirstChild("ActiveIndicator");if TIE then pcall(function()TweenService:Create(TIE,TwI,{ImageColor3=TIC}):Play()end)end;if TTE then pcall(function()TweenService:Create(TTE,TwI,{TextColor3=TTC}):Play()end);TTE.Font=TF end;if Ind then Ind.Visible=IA;pcall(function()TweenService:Create(Ind,TwI,{BackgroundTransparency=TInT}):Play()end)end;pcall(function()TweenService:Create(TB,TwI,{BackgroundColor3=TBgC}):Play()end);C.Visible=IA end;if FirstTab and PHA then FirstTab=false;STA(true)end;AddConnection(TB.MouseButton1Click,function()for _,Ch in ipairs(TabHolder:GetChildren())do if Ch:IsA("TextButton")and Ch:FindFirstChild("ActiveIndicator")and Ch~=TB then OCN="ItemContainer_"..(Ch:FindFirstChildWhichIsA("TextLabel",true)and Ch:FindFirstChildWhichIsA("TextLabel",true).Text:gsub("%s+","_")or"Unknown");OC=ContentArea:FindFirstChild(OCN);if OC and OC.Visible then OI=Ch:FindFirstChildWhichIsA("ImageLabel");OL=Ch:FindFirstChildWhichIsA("TextLabel");OInd=Ch:FindFirstChild("ActiveIndicator");TwI=TweenInfo.new(0.2,Enum.EasingStyle.Quad);if OI then pcall(function()TweenService:Create(OI,TwI,{ImageColor3=GetThemeColor("TextDark")}):Play()end)end;if OL then pcall(function()TweenService:Create(OL,TwI,{TextColor3=GetThemeColor("TextDark")}):Play()end);OL.Font=Enum.Font.GothamSemibold end;if OInd then OInd.Visible=false;pcall(function()TweenService:Create(OInd,TwI,{BackgroundTransparency=1}):Play()end)end;pcall(function()TweenService:Create(Ch,TwI,{BackgroundColor3=GetThemeColor("Second")}):Play()end);OC.Visible=false end end end;STA(true)end);
+        local function GetElements(ItemParent) local EF={}; --[[ Paste Element Functions Here (from V2, ensure nil checks)]] --; return EF end;
+        local ElementFunction={};local BaseElements=GetElements(C);if BaseElements then for FN,F in pairs(BaseElements)do ElementFunction[FN]=F end else warn("Orion Lib: GetElements returned nil for tab container.") end;
+        function ElementFunction:AddSection(SN) local SF=Create("Frame",{Name=SN or"Section",Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Parent=C},{MakeElement("List",0,10)});if not SF then return nil end;local E=GetElements(SF);if not E then SF:Destroy(); return nil end; E:AddLabel(SN);local EH=Create("Frame",{Name="ElementsHolder",Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Parent=SF},{MakeElement("List",0,6),MakeElement("Padding",0,10,0,0)});if not EH then SF:Destroy();return nil end;return GetElements(EH)end;
+        if P and not PHA then if C.UIListLayout then C.UIListLayout:Destroy()end;if C.UIPadding then C.UIPadding:Destroy()end;local Pl=CreateThemedElement("Frame",{Size=UDim2.fromScale(1,1),Parent=C},{MakeElement("Padding",20,20,20,20)},"Main");if Pl then CreateThemedElement("TextLabel",{Text="<b>Premium Required</b>",TextSize=18,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,Size=UDim2.new(1,0,0,30),Position=UDim2.new(0.5,0,0.3,0),AnchorPoint=Vector2.new(0.5,0.5),Parent=Pl},nil,"Text");CreateThemedElement("TextLabel",{Text="This feature requires a premium subscription.",TextSize=14,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,Size=UDim2.new(0.8,0,0,60),Position=UDim2.new(0.5,0,0.5,0),AnchorPoint=Vector2.new(0.5,0.5),TextWrapped=true,Parent=Pl},nil,"TextDark")end;local DF=function()warn("Orion Library: Attempted to add element to a locked Premium tab.")return nil end;for FN,_ in pairs(ElementFunction)do ElementFunction[FN]=DF end end;
+		return ElementFunction
+	end
+
+	OrionLib:Init()
+	OrionLib:MakeNotification({ Name = "Library Update Available", Content = "Consider upgrading to the latest Rayfield UI for new features! (sirius.menu/rayfield)", Time = 8, ThemeColor = "Accent" })
+	return TabFunction
+end
+
+function OrionLib:Destroy()
+	if OrionLib.Debug then print("Orion Library: Destroy called.") end
+	if Orion and Orion.Parent then Orion:Destroy() end
+	OrionLib.Elements = {}; OrionLib.ThemeObjects = {}; OrionLib.Connections = {}; OrionLib.Flags = {}; Orion = nil
+end
+
+return OrionLib
+
+--- END OF FIXED REVAMPED FILE V3 ---
