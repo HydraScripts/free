@@ -1,0 +1,115 @@
+local OrionLib = {
+    Elements = {},
+    ThemeObjects = {},
+    Connections = {},
+    Flags = {},
+    Themes = {
+        Default = {
+            Main = Color3.fromRGB(25, 25, 25),
+            Second = Color3.fromRGB(32, 32, 32),
+            Stroke = Color3.fromRGB(60, 60, 60),
+            Divider = Color3.fromRGB(60, 60, 60),
+            Text = Color3.fromRGB(240, 240, 240),
+            TextDark = Color3.fromRGB(150, 150, 150)
+        },
+        Viow = {
+            Main = Color3.fromRGB(40, 40, 40),
+            Second = Color3.fromRGB(58, 58, 58),
+            Stroke = Color3.fromRGB(80, 80, 80),
+            Divider = Color3.fromRGB(85, 85, 85),
+            Text = Color3.fromRGB(255, 255, 255),
+            TextDark = Color3.fromRGB(170, 170, 170)
+        },
+        Mars = {
+            Main = Color3.fromRGB(30, 30, 30),
+            Second = Color3.fromRGB(45, 45, 45),
+            Stroke = Color3.fromRGB(90, 90, 90),
+            Divider = Color3.fromRGB(95, 95, 95),
+            Text = Color3.fromRGB(255, 85, 85),  -- Mars vibes 🔥
+            TextDark = Color3.fromRGB(200, 100, 100)
+        },
+        Modern = {
+            Main = Color3.fromRGB(15, 15, 15),
+            Second = Color3.fromRGB(22, 22, 22),
+            Stroke = Color3.fromRGB(50, 50, 50),
+            Divider = Color3.fromRGB(60, 60, 60),
+            Text = Color3.fromRGB(200, 200, 200),
+            TextDark = Color3.fromRGB(120, 120, 120)
+        },
+        Neon = {
+            Main = Color3.fromRGB(15, 15, 15),
+            Second = Color3.fromRGB(30, 30, 30),
+            Stroke = Color3.fromRGB(50, 50, 50),
+            Divider = Color3.fromRGB(55, 55, 55),
+            Text = Color3.fromRGB(0, 255, 255),  -- Neon vibes 😱
+            TextDark = Color3.fromRGB(0, 200, 200)
+        },
+        Ocean = {
+            Main = Color3.fromRGB(18, 43, 69),
+            Second = Color3.fromRGB(28, 60, 92),
+            Stroke = Color3.fromRGB(56, 116, 184),
+            Divider = Color3.fromRGB(58, 118, 190),
+            Text = Color3.fromRGB(255, 255, 255),
+            TextDark = Color3.fromRGB(180, 180, 180)
+        },
+        Cyberpunk = {
+            Main = Color3.fromRGB(20, 20, 20),
+            Second = Color3.fromRGB(40, 40, 40),
+            Stroke = Color3.fromRGB(180, 40, 120),  -- Cyberpunk pink glow 😵‍💫
+            Divider = Color3.fromRGB(50, 50, 50),
+            Text = Color3.fromRGB(0, 255, 255),
+            TextDark = Color3.fromRGB(130, 255, 130)
+        },
+        Retro = {
+            Main = Color3.fromRGB(55, 55, 55),
+            Second = Color3.fromRGB(65, 65, 65),
+            Stroke = Color3.fromRGB(90, 90, 90),
+            Divider = Color3.fromRGB(100, 100, 100),
+            Text = Color3.fromRGB(255, 200, 0),  -- Retro vibes 🟨💥
+            TextDark = Color3.fromRGB(200, 150, 0)
+        },
+        DarkMode = {
+            Main = Color3.fromRGB(10, 10, 10),
+            Second = Color3.fromRGB(30, 30, 30),
+            Stroke = Color3.fromRGB(40, 40, 40),
+            Divider = Color3.fromRGB(50, 50, 50),
+            Text = Color3.fromRGB(255, 255, 255),
+            TextDark = Color3.fromRGB(170, 170, 170)
+        },
+        Midnight = {
+            Main = Color3.fromRGB(8, 8, 8),
+            Second = Color3.fromRGB(18, 18, 18),
+            Stroke = Color3.fromRGB(48, 48, 48),
+            Divider = Color3.fromRGB(58, 58, 58),
+            Text = Color3.fromRGB(190, 190, 255),  -- Midnight blues 😴✨
+            TextDark = Color3.fromRGB(120, 120, 180)
+        },
+        Galaxy = {
+            Main = Color3.fromRGB(30, 30, 45),
+            Second = Color3.fromRGB(50, 50, 80),
+            Stroke = Color3.fromRGB(100, 100, 150),
+            Divider = Color3.fromRGB(110, 110, 160),
+            Text = Color3.fromRGB(255, 255, 255),
+            TextDark = Color3.fromRGB(180, 180, 180)
+        },
+        Acidic = {
+            Main = Color3.fromRGB(10, 100, 10),
+            Second = Color3.fromRGB(30, 130, 30),
+            Stroke = Color3.fromRGB(70, 180, 70),
+            Divider = Color3.fromRGB(80, 200, 80),
+            Text = Color3.fromRGB(255, 255, 255),
+            TextDark = Color3.fromRGB(200, 200, 200)
+        },
+        Twilight = {
+            Main = Color3.fromRGB(50, 50, 80),
+            Second = Color3.fromRGB(70, 70, 110),
+            Stroke = Color3.fromRGB(120, 120, 160),
+            Divider = Color3.fromRGB(130, 130, 170),
+            Text = Color3.fromRGB(200, 200, 255),
+            TextDark = Color3.fromRGB(150, 150, 200)
+        }
+    },
+    SelectedTheme = "Ocean",
+    Folder = nil,
+    SaveCfg = false
+}
