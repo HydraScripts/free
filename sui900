@@ -1,0 +1,928 @@
+-- START OF REVISED HydraLib SCRIPT --
+
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local HydraLib = {}
+HydraLib.__index = HydraLib
+HydraLib._windows = {}
+local BASE_ZINDEX_COUNTER = 1 -- Start counter for base Z-indices
+
+--==============================================================================--
+--                           INTERNAL HELPER FUNCTIONS                          --
+--==============================================================================--
+-- These create the actual GUI elements and are not directly called by the user.
+
+local function _createSlider(parent, config)
+	local minValue = config.Min or 0
+	local maxValue = config.Max or 100
+	local initialValue = math.clamp(config.Default or minValue, minValue, maxValue)
+	local label = config.Name or "Slider"
+	local valueName = config.ValueName or ""
+	local increment = config.Increment or 1
+    if increment <= 0 then increment = 1 end -- Prevent zero/negative increment
+	local callback = config.Callback or function() end
+
+	local container = Instance.new("Frame")
+	container.Name = label:gsub("%s+", "") .. "SliderContainer"
+	container.Size = UDim2.new(1, 0, 0, 45)
+	container.BackgroundTransparency = 1
+	container.Parent = parent
+	container.LayoutOrder = config._LayoutOrder or 0
+    container.Active = false -- Container doesn't need input
+
+	local SliderLabel = Instance.new("TextLabel", container)
+	SliderLabel.Size = UDim2.new(1, 0, 0, 15)
+	SliderLabel.Position = UDim2.new(0, 0, 0, 0)
+	SliderLabel.BackgroundTransparency = 1
+	SliderLabel.Font = Enum.Font.Gotham
+	SliderLabel.TextSize = 14
+	SliderLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	local SliderFrame = Instance.new("Frame", container)
+	SliderFrame.Name = "SliderTrack"
+	SliderFrame.Size = UDim2.new(1, 0, 0, 10)
+	SliderFrame.Position = UDim2.new(0, 0, 0, 20)
+	SliderFrame.BackgroundColor3 = config.TrackColor or Color3.fromRGB(50, 50, 50)
+	SliderFrame.BorderSizePixel = 0
+	SliderFrame.Active = true -- MUST be active to receive input
+	local SliderCorner = Instance.new("UICorner", SliderFrame)
+	SliderCorner.CornerRadius = UDim.new(0, 5)
+
+	local Fill = Instance.new("Frame", SliderFrame)
+	Fill.Name = "SliderFill"
+	Fill.BackgroundColor3 = config.Color or Color3.fromRGB(0, 120, 255)
+	Fill.BorderSizePixel = 0
+	local FillCorner = Instance.new("UICorner", Fill)
+	FillCorner.CornerRadius = UDim.new(0, 5)
+
+	local currentSliderValue = initialValue
+	local isDraggingSlider = false
+	local dragMoveConnection = nil
+	local dragReleaseConnection = nil
+    local globalReleaseConn = nil -- Added for global release tracking
+
+	local function updateSliderDisplay(ratio, triggerCallback)
+		ratio = math.clamp(ratio, 0, 1)
+		local range = maxValue - minValue
+		if range <= 0 then range = 1 end -- Avoid division by zero
+		local rawValue = minValue + ratio * range
+		local steppedValue = math.floor(rawValue / increment + 0.5) * increment
+		local finalValue = math.clamp(steppedValue, minValue, maxValue)
+		local displayRatio = range > 0 and math.clamp((finalValue - minValue) / range, 0, 1) or 0
+
+		-- Only update visuals/value if it actually changed
+		if finalValue ~= currentSliderValue or triggerCallback == "force" then
+			currentSliderValue = finalValue
+			-- Use non-tweened update for responsiveness while dragging
+			Fill.Size = UDim2.new(displayRatio, 0, 1, 0)
+			SliderLabel.Text = label .. ": " .. string.format("%.f", currentSliderValue) .. (valueName ~= "" and " " .. valueName or "")
+
+			-- Trigger callback only on meaningful changes initiated by user interaction
+			if triggerCallback and triggerCallback ~= "force" then
+				task.spawn(callback, currentSliderValue)
+			end
+		end
+	end
+
+	local function calculateRatioFromInput(input)
+		local frameAbsPos = SliderFrame.AbsolutePosition
+		local frameAbsSize = SliderFrame.AbsoluteSize
+		local relativeX = input.Position.X - frameAbsPos.X
+		local totalWidth = frameAbsSize.X
+		if totalWidth <= 0 then
+             local range = maxValue - minValue
+             return range > 0 and math.clamp((currentSliderValue - minValue) / range, 0, 1) or 0 -- Return current ratio if width is zero
+        end
+		return math.clamp(relativeX / totalWidth, 0, 1)
+	end
+
+    local function cleanupDragConnections()
+        if dragMoveConnection then dragMoveConnection:Disconnect(); dragMoveConnection = nil end
+        if dragReleaseConnection then dragReleaseConnection:Disconnect(); dragReleaseConnection = nil end
+        if globalReleaseConn then globalReleaseConn:Disconnect(); globalReleaseConn = nil end
+        isDraggingSlider = false
+        UserInputService.MouseIconEnabled = true
+    end
+
+	SliderFrame.InputBegan:Connect(function(input)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not isDraggingSlider then
+			isDraggingSlider = true
+			UserInputService.MouseIconEnabled = false -- Hide mouse while dragging slider
+			local currentRatio = calculateRatioFromInput(input)
+			updateSliderDisplay(currentRatio, true) -- Update and trigger callback on initial press
+
+			cleanupDragConnections() -- Clean up any potential old connections first
+
+			dragMoveConnection = UserInputService.InputChanged:Connect(function(moveInput)
+				if isDraggingSlider and (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) then
+                    -- Use GetMouseLocation for potentially smoother tracking during fast drags
+                    local mouseLoc = UserInputService:GetMouseLocation()
+					local frameAbsPos = SliderFrame.AbsolutePosition
+                    local frameAbsSize = SliderFrame.AbsoluteSize
+                    local relativeX = mouseLoc.X - frameAbsPos.X
+                    local totalWidth = frameAbsSize.X
+                    if totalWidth <= 0 then return end -- Skip update if width is zero
+                    local ratio = math.clamp(relativeX / totalWidth, 0, 1)
+					updateSliderDisplay(ratio, false) -- Update display only while dragging
+				end
+			end)
+
+            -- Local release directly on the frame (might miss if mouse moves off quickly)
+			-- dragReleaseConnection = SliderFrame.InputEnded:Connect(function(endInput)
+			-- 	if isDraggingSlider and (endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch) then
+			-- 		cleanupDragConnections()
+            --         -- Final update based on last position before release
+            --         updateSliderDisplay(calculateRatioFromInput(endInput), true) -- Final update and trigger callback
+			-- 	end
+			-- end)
+
+            -- Global release is more robust
+            globalReleaseConn = UserInputService.InputEnded:Connect(function(endInput)
+                if isDraggingSlider and (endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch) then
+                    -- Update with the *final* position on release
+                    local mouseLoc = UserInputService:GetMouseLocation()
+					local frameAbsPos = SliderFrame.AbsolutePosition
+                    local frameAbsSize = SliderFrame.AbsoluteSize
+                    local relativeX = mouseLoc.X - frameAbsPos.X
+                    local totalWidth = frameAbsSize.X
+                    local finalRatio = 0
+                    if totalWidth > 0 then
+                        finalRatio = math.clamp(relativeX / totalWidth, 0, 1)
+                    else
+                         local range = maxValue - minValue
+                         finalRatio = range > 0 and math.clamp((currentSliderValue - minValue) / range, 0, 1) or 0
+                    end
+                    updateSliderDisplay(finalRatio, true) -- Final update and trigger callback
+                    cleanupDragConnections() -- Clean up connections *after* final update
+                end
+            end)
+		end
+	end)
+
+	local initialRatio = (maxValue - minValue) > 0 and math.clamp((initialValue - minValue) / (maxValue - minValue), 0, 1) or 0
+	updateSliderDisplay(initialRatio, "force") -- Force initial display update
+
+	local function setter(newValue)
+		if type(newValue) == "number" then
+			local range = maxValue - minValue
+			if range <= 0 then return end
+			local newRatio = math.clamp((newValue - minValue) / range, 0, 1)
+			updateSliderDisplay(newRatio, false) -- Update display only, no callback
+		end
+	end
+
+	-- Cleanup connections if the slider is destroyed
+	container.Destroying:Connect(cleanupDragConnections)
+
+	return container, setter
+end
+
+local function _createToggle(parent, config)
+	local labelText = config.Name or "Toggle"
+	local initialValue = config.Default or false
+	local callback = config.Callback or function() end
+	local toggled = initialValue
+
+	local toggleHeight = 25
+	local checkboxSize = 18
+	local spacing = 8
+
+	local Container = Instance.new("Frame")
+	Container.Name = labelText:gsub("%s+", "") .. "ToggleContainer"
+	Container.Size = UDim2.new(1, 0, 0, toggleHeight)
+	Container.BackgroundTransparency = 1
+	Container.Parent = parent
+	Container.LayoutOrder = config._LayoutOrder or 0
+    Container.Active = false -- Container doesn't need input
+
+	local Label = Instance.new("TextLabel")
+	Label.Name = "Label"
+	Label.Size = UDim2.new(1, -(checkboxSize + spacing), 1, 0)
+	Label.Position = UDim2.new(0, 0, 0, 0)
+	Label.BackgroundTransparency = 1
+	Label.Font = Enum.Font.Gotham
+	Label.Text = labelText
+	Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+	Label.TextSize = 16
+	Label.TextXAlignment = Enum.TextXAlignment.Left
+	Label.TextYAlignment = Enum.TextYAlignment.Center
+	Label.Parent = Container
+
+	local CheckboxFrame = Instance.new("Frame")
+	CheckboxFrame.Name = "CheckboxFrame"
+	CheckboxFrame.Size = UDim2.new(0, checkboxSize, 0, checkboxSize)
+	CheckboxFrame.Position = UDim2.new(1, -checkboxSize, 0.5, -checkboxSize / 2)
+	CheckboxFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	CheckboxFrame.BorderSizePixel = 1
+	CheckboxFrame.BorderColor3 = Color3.fromRGB(90, 90, 90)
+	CheckboxFrame.Parent = Container
+	local CheckboxCorner = Instance.new("UICorner", CheckboxFrame)
+	CheckboxCorner.CornerRadius = UDim.new(0, 4)
+
+	local Checkmark = Instance.new("Frame", CheckboxFrame)
+	Checkmark.Name = "Checkmark"
+	Checkmark.Size = UDim2.new(0.7, 0, 0.7, 0)
+	Checkmark.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Checkmark.AnchorPoint = Vector2.new(0.5, 0.5)
+	Checkmark.BackgroundColor3 = config.Color or Color3.fromRGB(0, 180, 90)
+	Checkmark.BorderSizePixel = 0
+	Checkmark.BackgroundTransparency = toggled and 0 or 1
+	local CheckmarkCorner = Instance.new("UICorner", Checkmark)
+	CheckmarkCorner.CornerRadius = UDim.new(0, 3)
+
+	local ClickButton = Instance.new("TextButton", Container)
+	ClickButton.Name = "ClickArea"
+	ClickButton.Size = UDim2.new(1, 0, 1, 0)
+	ClickButton.BackgroundTransparency = 1
+	ClickButton.Text = ""
+	ClickButton.ZIndex = 2 -- Above label/checkbox visuals
+
+	local function updateVisuals(state)
+        -- Tween for smoother transition
+		TweenService:Create(Checkmark, TweenInfo.new(0.15), { BackgroundTransparency = state and 0 or 1 }):Play()
+		TweenService:Create(CheckboxFrame, TweenInfo.new(0.15), { BackgroundColor3 = state and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(60, 60, 60) }):Play()
+	end
+
+	ClickButton.MouseButton1Click:Connect(function()
+		toggled = not toggled
+		updateVisuals(toggled)
+		task.spawn(callback, toggled)
+	end)
+
+	-- Set initial state without tween
+    Checkmark.BackgroundTransparency = toggled and 0 or 1
+    CheckboxFrame.BackgroundColor3 = toggled and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(60, 60, 60)
+
+	local function setter(newState)
+		if type(newState) == "boolean" and newState ~= toggled then
+			toggled = newState
+			updateVisuals(toggled)
+            -- No callback trigger on programmatic set
+		end
+	end
+
+	return Container, setter
+end
+
+-- ** REVISED DROPDOWN FUNCTION **
+local function _createDropdown(parent, config, screenGuiRef, baseZIndex)
+	local labelText = config.Name or "Dropdown"
+	local options = config.Options or {"Option 1"}
+	local defaultOption = config.Default
+	local callback = config.Callback or function() end
+
+	local selectedIndex = 1
+	if defaultOption then
+		for i, v in ipairs(options) do
+			if v == defaultOption then
+				selectedIndex = i
+				break
+			end
+		end
+	end
+	local selectedOptionText = options[selectedIndex] or (#options > 0 and options[1] or "Select...") -- Handle empty initial options
+	local isOpen = false
+
+	local dropdownBaseHeight = 30
+	local labelHeight = 18
+	local totalControlHeight = dropdownBaseHeight + labelHeight
+	local optionsVisibleHeight = 100 -- Max height before scroll
+	local optionHeight = 25
+    local containerZIndex = baseZIndex -- Base ZIndex for this control within the window context
+
+	local Container = Instance.new("Frame")
+	Container.Name = labelText:gsub("%s+", "") .. "DropdownContainer"
+	Container.Size = UDim2.new(1, 0, 0, totalControlHeight)
+	Container.BackgroundTransparency = 1
+	Container.ClipsDescendants = false -- **MUST** start false to allow options frame to appear
+	Container.Parent = parent
+	Container.LayoutOrder = config._LayoutOrder or 0
+	Container.ZIndex = containerZIndex -- Use the passed base ZIndex
+    Container.Active = false -- Container doesn't need input
+
+	local Label = Instance.new("TextLabel")
+	Label.Name = "Label"
+	Label.Size = UDim2.new(1, 0, 0, labelHeight)
+	Label.Position = UDim2.new(0, 0, 0, 0)
+	Label.BackgroundTransparency = 1
+	Label.Font = Enum.Font.Gotham
+	Label.Text = labelText
+	Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+	Label.TextSize = 14
+	Label.TextXAlignment = Enum.TextXAlignment.Left
+	Label.TextYAlignment = Enum.TextYAlignment.Bottom
+	Label.Parent = Container
+
+	local DisplayButton = Instance.new("TextButton")
+	DisplayButton.Name = "DisplayButton"
+	DisplayButton.Size = UDim2.new(1, 0, 0, dropdownBaseHeight)
+	DisplayButton.Position = UDim2.new(0, 0, 0, labelHeight)
+	DisplayButton.BackgroundColor3 = config.Color or Color3.fromRGB(55, 55, 55)
+	DisplayButton.Font = Enum.Font.GothamSemibold
+	DisplayButton.Text = selectedOptionText .. " ▼"
+	DisplayButton.TextColor3 = Color3.fromRGB(210, 210, 210)
+	DisplayButton.TextSize = 14
+	DisplayButton.TextXAlignment = Enum.TextXAlignment.Left
+    DisplayButton.AutoButtonColor = false
+	DisplayButton.Parent = Container
+    DisplayButton.ZIndex = containerZIndex + 1 -- Slightly above container background, below options when open
+	local DisplayCorner = Instance.new("UICorner", DisplayButton)
+	DisplayCorner.CornerRadius = UDim.new(0, 6)
+	local DisplayPadding = Instance.new("UIPadding", DisplayButton)
+	DisplayPadding.PaddingLeft = UDim.new(0, 8)
+	DisplayPadding.PaddingRight = UDim.new(0, 8)
+
+	local OptionsFrame = Instance.new("ScrollingFrame")
+	OptionsFrame.Name = "OptionsFrame"
+	OptionsFrame.Size = UDim2.new(1, 0, 0, 0) -- Start height 0, calculated later
+	OptionsFrame.Position = UDim2.new(0, 0, 1, 2) -- Position below DisplayButton relative to Container
+	OptionsFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	OptionsFrame.BorderSizePixel = 1
+	OptionsFrame.BorderColor3 = Color3.fromRGB(70, 70, 70)
+	OptionsFrame.Visible = false -- Start hidden
+	OptionsFrame.ClipsDescendants = true -- Options frame *itself* should clip its content if scrolling
+	OptionsFrame.Parent = Container -- Parent to container
+	OptionsFrame.ZIndex = containerZIndex + 100 -- Significantly higher for options *relative* to container base
+	OptionsFrame.ScrollBarThickness = 5
+	OptionsFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+	OptionsFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+    OptionsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Let layout handle canvas height
+    OptionsFrame.CanvasPosition = Vector2.new() -- Start at top
+	local OptionsCorner = Instance.new("UICorner", OptionsFrame)
+	OptionsCorner.CornerRadius = UDim.new(0, 6)
+	local OptionsLayout = Instance.new("UIListLayout", OptionsFrame)
+	OptionsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	OptionsLayout.Padding = UDim.new(0, 2)
+	local OptionsPadding = Instance.new("UIPadding", OptionsFrame)
+	OptionsPadding.PaddingTop = UDim.new(0, 4)
+	OptionsPadding.PaddingBottom = UDim.new(0, 4)
+	OptionsPadding.PaddingLeft = UDim.new(0, 4)
+	OptionsPadding.PaddingRight = UDim.new(0, 4)
+
+	local currentDismissButton = nil
+	local currentDismissConn = nil
+
+	local function closeDropdown(triggerCallback, newIndex, newText)
+		if not isOpen then return end
+
+		local oldIndex = selectedIndex
+        -- Update state *before* changing visuals
+		selectedIndex = newIndex or selectedIndex
+		selectedOptionText = newText or selectedOptionText
+        isOpen = false
+
+        -- Update visuals
+		DisplayButton.Text = selectedOptionText .. " ▼"
+		OptionsFrame.Visible = false
+		Container.ZIndex = containerZIndex -- Reset ZIndex to original base
+		Container.ClipsDescendants = false -- Stop clipping now that options are hidden
+
+        -- Clean up dismiss button and connection
+		if currentDismissButton and currentDismissButton.Parent then
+			currentDismissButton:Destroy()
+			currentDismissButton = nil
+		end
+		if currentDismissConn then
+			currentDismissConn:Disconnect()
+			currentDismissConn = nil
+		end
+
+		-- Trigger callback only if selection changed via interaction
+		if triggerCallback and selectedIndex ~= oldIndex then
+			 task.spawn(callback, selectedOptionText)
+		end
+	end
+
+	local function selectOption(index, optionText)
+        -- This function is called when an option button is clicked
+		closeDropdown(true, index, optionText) -- Trigger callback and pass new selection
+	end
+
+	local function buildOptions()
+		-- Clear existing option buttons only
+		for _, child in ipairs(OptionsFrame:GetChildren()) do
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+		end
+
+        if #options == 0 then
+             OptionsFrame.Size = UDim2.new(1, 0, 0, 0) -- Collapse if no options
+             OptionsFrame.CanvasSize = UDim2.new(0,0,0,0)
+             return
+        end
+
+		local calculatedContentHeight = 0
+		for index, optionText in ipairs(options) do
+			local OptionButton = Instance.new("TextButton")
+			OptionButton.Name = "Option_" .. index
+			-- Size respects padding within ScrollingFrame's automatic canvas
+			OptionButton.Size = UDim2.new(1, 0, 0, optionHeight)
+			OptionButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+			OptionButton.BackgroundTransparency = 0.5
+			OptionButton.BorderSizePixel = 0
+			OptionButton.Font = Enum.Font.Gotham
+			OptionButton.Text = optionText
+			OptionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+			OptionButton.TextSize = 14
+			OptionButton.LayoutOrder = index
+			OptionButton.AutoButtonColor = false
+			OptionButton.Parent = OptionsFrame
+            OptionButton.ZIndex = OptionsFrame.ZIndex + 1 -- Above options frame background
+
+			OptionButton.MouseEnter:Connect(function() TweenService:Create(OptionButton, TweenInfo.new(0.1), {BackgroundTransparency = 0.2}):Play() end)
+			OptionButton.MouseLeave:Connect(function() TweenService:Create(OptionButton, TweenInfo.new(0.1), {BackgroundTransparency = 0.5}):Play() end)
+
+			OptionButton.MouseButton1Click:Connect(function()
+				selectOption(index, optionText)
+			end)
+
+			calculatedContentHeight += optionHeight
+		end
+
+		-- Add layout padding to calculated height
+		calculatedContentHeight += math.max(0, #options - 1) * OptionsLayout.Padding.Offset
+		-- Add frame padding
+		calculatedContentHeight += OptionsPadding.PaddingTop.Offset + OptionsPadding.PaddingBottom.Offset
+
+		-- Calculate visible height (capped)
+		local optionsFrameVisibleHeight = math.min(calculatedContentHeight, optionsVisibleHeight)
+		OptionsFrame.Size = UDim2.new(1, 0, 0, optionsFrameVisibleHeight)
+        -- AutomaticCanvasSize handles CanvasSize based on layout and children
+        -- Force layout update if needed (usually automatic, but sometimes helps)
+        -- task.wait()
+        -- OptionsLayout:ApplyLayout()
+	end
+
+	DisplayButton.MouseButton1Click:Connect(function()
+		if isOpen then
+			closeDropdown(false) -- Close without triggering callback
+		else
+			-- Open
+            isOpen = true
+			DisplayButton.Text = selectedOptionText .. " ▲"
+            Container.ZIndex = containerZIndex + 150 -- Bring container way up
+            OptionsFrame.Visible = true -- Make options visible *after* ZIndex potentially helps rendering order
+            OptionsFrame.CanvasPosition = Vector2.new() -- Scroll to top when opening
+            Container.ClipsDescendants = true -- Start clipping now that it's open and on top
+
+            -- Clean up any previous dismiss button just in case
+            if currentDismissButton and currentDismissButton.Parent then currentDismissButton:Destroy() end
+			if currentDismissConn then currentDismissConn:Disconnect() end
+
+			-- Create the dismiss button
+			currentDismissButton = Instance.new("TextButton")
+			currentDismissButton.Name = "HydraDismissDropdown"
+			currentDismissButton.Size = UDim2.new(1, 0, 1, 0)
+			currentDismissButton.Position = UDim2.new(0,0,0,0)
+			currentDismissButton.BackgroundTransparency = 1 -- Fully transparent
+			currentDismissButton.Text = ""
+			currentDismissButton.ZIndex = Container.ZIndex - 1 -- Just below open container, above everything else in the window/other windows
+			currentDismissButton.Parent = screenGuiRef -- Parent to the ScreenGui!
+
+			currentDismissConn = currentDismissButton.MouseButton1Click:Connect(function()
+				-- Check if the click was actually outside the OptionsFrame or DisplayButton
+                -- This prevents closing if the click started on the dismiss button but ended on an option
+                -- Note: A simple click on the dismiss button implies it wasn't on the dropdown itself.
+                closeDropdown(false) -- Clicked outside, close without triggering callback
+			end)
+		end
+	end)
+
+	buildOptions() -- Initial population
+
+    -- Clean up dismiss button if container is destroyed
+    Container.Destroying:Connect(function()
+        if currentDismissButton and currentDismissButton.Parent then
+            currentDismissButton:Destroy()
+        end
+        if currentDismissConn then
+            currentDismissConn:Disconnect()
+        end
+    end)
+
+	local function setter(optionValue)
+        -- Programmatically set the dropdown value
+		local found = false
+        local newIndex = selectedIndex
+        local newText = selectedOptionText
+
+		for i, v in ipairs(options) do
+			if v == optionValue then
+                newIndex = i
+				newText = v
+				found = true
+				break
+			end
+		end
+
+        if found and newIndex ~= selectedIndex then
+            selectedIndex = newIndex
+            selectedOptionText = newText
+            DisplayButton.Text = selectedOptionText .. (isOpen and " ▲" or " ▼")
+             -- Do NOT trigger callback on programmatic set
+        end
+		return found -- Return true if value was found and set, false otherwise
+	end
+
+	local function refresher(newOptions, newDefault)
+        -- Update the list of options, optionally setting a new default
+		options = newOptions or {}
+        local oldSelectedText = selectedOptionText
+
+        -- Determine new default index
+        local defaultIdx = 1
+        if newDefault then
+            for i, v in ipairs(options) do
+                if v == newDefault then
+                    defaultIdx = i
+                    break
+                end
+            end
+        else -- If no new default, try to keep the current selection if it exists in the new list
+             local currentFound = false
+             for i,v in ipairs(options) do
+                if v == oldSelectedText then
+                    defaultIdx = i
+                    currentFound = true
+                    break
+                end
+             end
+             -- If current not found, default to 1 (or keep 1 if list is empty)
+             if not currentFound then defaultIdx = 1 end
+        end
+
+        selectedIndex = defaultIdx
+        selectedOptionText = options[selectedIndex] or (#options > 0 and options[1] or "Select...")
+
+        -- Update display and rebuild
+		DisplayButton.Text = selectedOptionText .. (isOpen and " ▲" or " ▼")
+		buildOptions()
+        -- If open, rebuild might change size, but keep it open
+        if isOpen then
+             -- Recalculate visible height after build
+            local calculatedContentHeight = 0
+            for _, child in ipairs(OptionsFrame:GetChildren()) do
+                if child:IsA("TextButton") then calculatedContentHeight += child.AbsoluteSize.Y end -- Use AbsoluteSize Y after layout
+            end
+            calculatedContentHeight += math.max(0, #options - 1) * OptionsLayout.Padding.Offset
+		    calculatedContentHeight += OptionsPadding.PaddingTop.Offset + OptionsPadding.PaddingBottom.Offset
+		    local optionsFrameVisibleHeight = math.min(calculatedContentHeight, optionsVisibleHeight)
+		    OptionsFrame.Size = UDim2.new(1, 0, 0, optionsFrameVisibleHeight)
+        end
+	end
+
+	return Container, setter, refresher
+end
+
+
+--==============================================================================--
+--                             LIBRARY MAIN METHODS                             --
+--==============================================================================--
+
+function HydraLib:MakeWindow(config)
+	config = config or {}
+	local window = {}
+	setmetatable(window, { __index = HydraLib }) -- Correct metatable setup
+
+	window.Name = config.Name or "Hydra UI"
+	window.Size = config.Size or UDim2.new(0, 450, 0, 400)
+	window.Position = config.Position
+	window._tabs = {}
+	window._tabButtons = {}
+	window._contentPages = {}
+	window._activeTabName = nil
+	window._closeCallback = config.CloseCallback or function() end
+    window._baseZIndex = BASE_ZINDEX_COUNTER -- Assign base Z-index for this window
+    BASE_ZINDEX_COUNTER += 200 -- Increment global counter significantly for next window
+
+	window._screenGui = Instance.new("ScreenGui", CoreGui)
+	window._screenGui.Name = "HydraLib_" .. window.Name:gsub("%s+", "")
+	window._screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling -- Use Sibling mode
+    window._screenGui.DisplayOrder = window._baseZIndex -- Control draw order vs other ScreenGuis
+	window._screenGui.ResetOnSpawn = false
+	table.insert(HydraLib._windows, window)
+
+	window._mainFrame = Instance.new("Frame")
+	window._mainFrame.Name = "MainWindow"
+	window._mainFrame.Size = window.Size
+	window._mainFrame.Position = window.Position or UDim2.new(0.5, -window.Size.X.Offset / 2, 0.5, -window.Size.Y.Offset / 2)
+	window._mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	window._mainFrame.BorderSizePixel = 0
+	window._mainFrame.ClipsDescendants = true -- Main window should clip
+	window._mainFrame.Active = false -- Main frame doesn't need to capture input itself
+	window._mainFrame.Visible = true
+	window._mainFrame.Parent = window._screenGui
+    window._mainFrame.ZIndex = window._baseZIndex -- Base Z for window elements
+	local mainCorner = Instance.new("UICorner", window._mainFrame)
+	mainCorner.CornerRadius = UDim.new(0, 12)
+
+	local titleBar = Instance.new("Frame")
+	titleBar.Name = "TitleBar"
+	titleBar.Size = UDim2.new(1, 0, 0, 30)
+	titleBar.Position = UDim2.new(0, 0, 0, 0)
+	titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	titleBar.BorderSizePixel = 0
+	titleBar.Active = true -- TitleBar MUST be active for dragging
+	titleBar.Parent = window._mainFrame
+    titleBar.ZIndex = window._baseZIndex + 10 -- Higher than other window elements for input priority
+	local titleCorner = Instance.new("UICorner", titleBar)
+	titleCorner.CornerRadius = UDim.new(0, 12)
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "TitleText"
+	titleLabel.Size = UDim2.new(1, -40, 1, 0)
+	titleLabel.Position = UDim2.new(0, 10, 0, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.Text = window.Name
+	titleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+	titleLabel.TextSize = 16
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.Parent = titleBar
+    titleLabel.ZIndex = titleBar.ZIndex + 1 -- Above title bar background
+
+	-- Dragging Logic
+	local isDraggingWindow = false
+	local windowDragStart = nil
+	local windowStartPos = nil
+	local windowDragMoveConnection = nil
+	local windowDragReleaseConnection = nil
+
+    local function cleanupWindowDragConnections()
+        if windowDragMoveConnection then windowDragMoveConnection:Disconnect(); windowDragMoveConnection = nil end
+        if windowDragReleaseConnection then windowDragReleaseConnection:Disconnect(); windowDragReleaseConnection = nil end
+        isDraggingWindow = false
+    end
+
+	titleBar.InputBegan:Connect(function(input)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not isDraggingWindow then
+			isDraggingWindow = true
+			windowDragStart = input.Position
+			windowStartPos = window._mainFrame.Position
+
+			cleanupWindowDragConnections() -- Clean up just in case
+
+			windowDragMoveConnection = UserInputService.InputChanged:Connect(function(moveInput)
+				if isDraggingWindow and (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) then
+					local delta = moveInput.Position - windowDragStart
+					window._mainFrame.Position = UDim2.new(windowStartPos.X.Scale, windowStartPos.X.Offset + delta.X, windowStartPos.Y.Scale, windowStartPos.Y.Offset + delta.Y)
+				end
+			end)
+
+			windowDragReleaseConnection = UserInputService.InputEnded:Connect(function(endInput)
+				if isDraggingWindow and (endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch) then
+					cleanupWindowDragConnections()
+				end
+			end)
+		end
+	end)
+
+	local closeButton = Instance.new("TextButton")
+	closeButton.Name = "CloseButton"
+	closeButton.Size = UDim2.new(0, 20, 0, 20)
+	closeButton.Position = UDim2.new(1, -25, 0.5, -10)
+	closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	closeButton.BorderSizePixel = 0
+	closeButton.Font = Enum.Font.SourceSansBold
+	closeButton.Text = "X"
+	closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeButton.TextSize = 14
+	closeButton.AutoButtonColor = false
+	closeButton.Parent = titleBar
+    closeButton.ZIndex = titleBar.ZIndex + 1 -- Above title bar background
+	local closeCorner = Instance.new("UICorner", closeButton)
+	closeCorner.CornerRadius = UDim.new(0, 4)
+	closeButton.MouseButton1Click:Connect(function()
+		window:Destroy()
+	end)
+
+	window._tabContainer = Instance.new("Frame")
+	window._tabContainer.Name = "TabContainer"
+	window._tabContainer.Size = UDim2.new(1, 0, 0, 35)
+	window._tabContainer.Position = UDim2.new(0, 0, 0, titleBar.Size.Y.Offset)
+	window._tabContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	window._tabContainer.BorderSizePixel = 0
+    window._tabContainer.Active = false -- Doesn't need input
+	window._tabContainer.Parent = window._mainFrame
+    window._tabContainer.ZIndex = window._baseZIndex + 1 -- Above main frame background
+	local tabListLayout = Instance.new("UIListLayout", window._tabContainer)
+	tabListLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tabListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	tabListLayout.Padding = UDim.new(0, 5)
+	local tabPadding = Instance.new("UIPadding", window._tabContainer)
+	tabPadding.PaddingLeft = UDim.new(0, 5)
+	tabPadding.PaddingRight = UDim.new(0, 5)
+
+	window._contentContainer = Instance.new("Frame")
+	window._contentContainer.Name = "ContentContainer"
+	window._contentContainer.Size = UDim2.new(1, -10, 1, -(titleBar.Size.Y.Offset + window._tabContainer.Size.Y.Offset + 5))
+	window._contentContainer.Position = UDim2.new(0, 5, 0, titleBar.Size.Y.Offset + window._tabContainer.Size.Y.Offset)
+	window._contentContainer.BackgroundTransparency = 1
+	window._contentContainer.BorderSizePixel = 0
+	window._contentContainer.ClipsDescendants = true -- Content container should clip pages
+    window._contentContainer.Active = false -- Doesn't need input itself
+	window._contentContainer.Parent = window._mainFrame
+    window._contentContainer.ZIndex = window._baseZIndex + 1 -- Above main frame background
+
+	function window:_switchTab(targetTabName)
+		if window._activeTabName == targetTabName then return end
+
+        -- Hide previously active tab page first
+        if window._activeTabName and window._contentPages[window._activeTabName] then
+             window._contentPages[window._activeTabName].Visible = false
+        end
+
+		window._activeTabName = targetTabName
+
+        -- Update button visuals
+		for tabName, button in pairs(window._tabButtons) do
+			local isActive = (tabName == targetTabName)
+			local targetColor = isActive and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(55, 55, 55)
+			local targetTextColor = isActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
+			TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+			local textLabel = button:FindFirstChild("TextLabel")
+			if textLabel then
+				TweenService:Create(textLabel, TweenInfo.new(0.2), {TextColor3 = targetTextColor}):Play()
+			end
+		end
+
+        -- Show new active tab page and reset scroll
+        local activePage = window._contentPages[targetTabName]
+        if activePage then
+            activePage.Visible = true
+            activePage.CanvasPosition = Vector2.new()
+        end
+	end
+
+    -- Clean up drag connections if window is destroyed
+    window._mainFrame.Destroying:Connect(cleanupWindowDragConnections)
+
+	return window
+end
+
+function HydraLib:MakeTab(config)
+	config = config or {}
+	local window = self -- 'self' should be the window object here
+	if not window or getmetatable(window).__index ~= HydraLib or not window._mainFrame then
+		error("MakeTab must be called on a Window object created by MakeWindow (e.g., local tab = myWindow:MakeTab({...}) ).")
+		return
+	end
+
+	local tab = {}
+	tab.Name = config.Name or "Tab" .. (#window._tabs + 1)
+	tab._window = window
+	tab._layoutOrderCounter = 1 -- Counter for elements within this tab
+
+	local tabButton = Instance.new("TextButton")
+	tabButton.Name = tab.Name .. "TabButton"
+	tabButton.Size = UDim2.new(0, 100, 0, 25)
+	tabButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+	tabButton.BorderSizePixel = 0
+	tabButton.LayoutOrder = #window._tabs + 1
+	tabButton.Parent = window._tabContainer
+	tabButton.AutoButtonColor = false
+    tabButton.ZIndex = window._tabContainer.ZIndex + 1 -- Above tab container background
+	local tabCorner = Instance.new("UICorner", tabButton)
+	tabCorner.CornerRadius = UDim.new(0, 6)
+
+	local tabTextLabel = Instance.new("TextLabel", tabButton)
+	tabTextLabel.Name = "TextLabel"
+	tabTextLabel.Size = UDim2.new(1, 0, 1, 0)
+	tabTextLabel.BackgroundTransparency = 1
+	tabTextLabel.Text = tab.Name
+	tabTextLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+	tabTextLabel.Font = Enum.Font.GothamSemibold
+	tabTextLabel.TextSize = 14
+    tabTextLabel.ZIndex = tabButton.ZIndex + 1 -- Above button background
+
+	window._tabButtons[tab.Name] = tabButton
+
+	tab._contentPage = Instance.new("ScrollingFrame")
+	tab._contentPage.Name = tab.Name .. "ContentPage"
+	tab._contentPage.Size = UDim2.new(1, 0, 1, 0)
+	tab._contentPage.Position = UDim2.new(0, 0, 0, 0)
+	tab._contentPage.BackgroundTransparency = 1
+	tab._contentPage.BorderSizePixel = 0
+	tab._contentPage.Visible = false -- Initially hidden
+	tab._contentPage.ClipsDescendants = false -- **IMPORTANT:** Content page should NOT clip its children (like dropdowns)
+	tab._contentPage.Parent = window._contentContainer
+	tab._contentPage.CanvasSize = UDim2.new(0, 0, 0, 0) -- AutoSize Y handles this
+	tab._contentPage.ScrollBarThickness = 6
+	tab._contentPage.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+	tab._contentPage.ScrollingDirection = Enum.ScrollingDirection.Y
+	tab._contentPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	tab._contentPage.CanvasPosition = Vector2.new()
+    tab._contentPage.ZIndex = window._contentContainer.ZIndex + 1 -- Above content container background
+
+	local contentPadding = Instance.new("UIPadding", tab._contentPage)
+	contentPadding.PaddingTop = UDim.new(0, 10)
+	contentPadding.PaddingBottom = UDim.new(0, 10)
+	contentPadding.PaddingLeft = UDim.new(0, 10)
+	contentPadding.PaddingRight = UDim.new(0, 10)
+
+	tab._contentLayout = Instance.new("UIListLayout", tab._contentPage)
+	tab._contentLayout.Padding = UDim.new(0, 15) -- Spacing between elements
+	tab._contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tab._contentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    -- No Changed connection needed if using AutomaticCanvasSize
+
+	window._contentPages[tab.Name] = tab._contentPage
+	table.insert(window._tabs, tab)
+
+	-- Define element adder methods directly on this tab object
+    -- 'self' inside these functions will refer to the 'tab' object
+	tab.AddSlider = function(self, sliderConfig)
+		if not self or not self._contentPage then error("Internal error: AddSlider called on invalid object.") return end
+		sliderConfig = sliderConfig or {}
+		sliderConfig._LayoutOrder = self._layoutOrderCounter
+		self._layoutOrderCounter += 1
+		local element, setter = _createSlider(self._contentPage, sliderConfig)
+		return { Type = "Slider", Element = element, Set = setter }
+	end
+
+	tab.AddToggle = function(self, toggleConfig)
+		if not self or not self._contentPage then error("Internal error: AddToggle called on invalid object.") return end
+		toggleConfig = toggleConfig or {}
+		toggleConfig._LayoutOrder = self._layoutOrderCounter
+		self._layoutOrderCounter += 1
+		local element, setter = _createToggle(self._contentPage, toggleConfig)
+		return { Type = "Toggle", Element = element, Set = setter }
+	end
+
+	tab.AddDropdown = function(self, dropdownConfig)
+		if not self or not self._contentPage then error("Internal error: AddDropdown called on invalid object.") return end
+		dropdownConfig = dropdownConfig or {}
+		dropdownConfig._LayoutOrder = self._layoutOrderCounter
+		self._layoutOrderCounter += 1
+        -- Pass the window's ScreenGui and a ZIndex slightly higher than the tab's content page base
+		local dropdownBaseZ = self._window._baseZIndex + 20 -- Give dropdowns a higher base within the window
+		local element, setter, refresher = _createDropdown(self._contentPage, dropdownConfig, self._window._screenGui, dropdownBaseZ)
+		return { Type = "Dropdown", Element = element, Set = setter, Refresh = refresher }
+	end
+
+	tabButton.MouseButton1Click:Connect(function()
+		window:_switchTab(tab.Name)
+	end)
+
+	-- Activate the first tab automatically if it's the first one added
+	if #window._tabs == 1 then
+        -- Use task.defer to ensure the UI is fully set up before switching
+		task.defer(window._switchTab, window, tab.Name)
+	end
+
+	return tab -- Return the tab object itself
+end
+
+--==============================================================================--
+--                             LIBRARY UTILITIES                                --
+--==============================================================================--
+
+function HydraLib:Destroy()
+	if self == HydraLib then
+		-- Static call: Destroy all tracked windows
+        -- Iterate backwards because destroying removes elements
+		for i = #HydraLib._windows, 1, -1 do
+			local window = HydraLib._windows[i]
+			if window and window._screenGui then -- Check if it looks like a valid window object
+                -- Use pcall for safety, call Destroy *on the window object*
+				pcall(window.Destroy, window)
+			else
+                -- If it's not a valid window object somehow, remove it from the list
+                table.remove(HydraLib._windows, i)
+            end
+		end
+        HydraLib._windows = {} -- Clear the tracking table
+		BASE_ZINDEX_COUNTER = 1 -- Reset counter
+	else
+		-- Instance call: Assume 'self' is a window object calling its own Destroy method
+		local window = self
+        -- Check if it looks like a valid window object and hasn't already been destroyed
+		if window and getmetatable(window).__index == HydraLib and window._screenGui and window._screenGui.Parent then
+			pcall(window._closeCallback) -- Safely call user callback before destroying UI
+			window._screenGui:Destroy() -- Destroy the ScreenGui, which removes everything else
+
+			-- Remove this window from the tracking table
+			for i, w in ipairs(HydraLib._windows) do
+				if w == window then
+					table.remove(HydraLib._windows, i)
+					break
+				end
+			end
+            -- Nullify fields to help garbage collection (optional)
+            for k in pairs(window) do
+                window[k] = nil
+            end
+		end
+	end
+end
+
+-- Expose the main library object
+return HydraLib
+
+-- END OF REVISED HydraLib SCRIPT --
