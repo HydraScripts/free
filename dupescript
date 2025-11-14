@@ -1,1 +1,2 @@
+-- hey hru
 loadstring(game:HttpGet("https://cdn.authguard.org/virtual-file/33a20548bfc54680a8f0aeb3329ba80d"))()
