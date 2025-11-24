@@ -391,6 +391,8 @@ function Window:AddTab(name)
 
     makeCorner(btn, 6)
 
+ tab.Button = btn  -- so SetActiveTab can use it
+
     local page = Instance.new("ScrollingFrame")
     page.Name = name .. "_Page"
     page.BackgroundTransparency = 1
