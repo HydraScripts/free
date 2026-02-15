@@ -1,0 +1,345 @@
+local Drawing = loadstring(game:HttpGet("https://raw.githubusercontent.com/linemaster2/storage/main/Drawing.lua"))();
+
+local Library = {};
+do
+	Library = {
+		Open = true;
+		Accent = Color3.fromRGB(207, 227, 0);
+		Pages = {};
+		Sections = {};
+		Flags = {};
+		UnNamedFlags = 0;
+		ThemeObjects = {};
+		Instances = {};
+		Holder = nil;
+		OldSize = nil;
+		ScreenGUI = nil;
+		DropdownOpen = false,
+		OptionListOpen = false,
+		Keys = {
+			[Enum.KeyCode.Space] = "Space", [Enum.KeyCode.Return] = "Return", [Enum.KeyCode.LeftShift] = "LShift",
+			[Enum.KeyCode.RightShift] = "RShift", [Enum.KeyCode.LeftControl] = "LCtrl", [Enum.KeyCode.RightControl] = "RCtrl",
+			[Enum.KeyCode.LeftAlt] = "LAlt", [Enum.KeyCode.RightAlt] = "RAlt", [Enum.KeyCode.CapsLock] = "CAPS",
+			[Enum.KeyCode.One] = "1", [Enum.KeyCode.Two] = "2", [Enum.KeyCode.Three] = "3", [Enum.KeyCode.Four] = "4",
+			[Enum.KeyCode.Five] = "5", [Enum.KeyCode.Six] = "6", [Enum.KeyCode.Seven] = "7", [Enum.KeyCode.Eight] = "8",
+			[Enum.KeyCode.Nine] = "9", [Enum.KeyCode.Zero] = "0", [Enum.UserInputType.MouseButton1] = "MB1",
+			[Enum.UserInputType.MouseButton2] = "MB2", [Enum.UserInputType.MouseButton3] = "MB3"
+		};
+		Connections = {};
+		FontSize = 12;
+		VisValues = {};
+		UIKey = Enum.KeyCode.Insert;
+		Notifs = {};
+	}
+
+	local Flags = {} 
+	local TweenService = game:GetService("TweenService")
+	local UserInputService = game:GetService("UserInputService")
+	local Mouse = game.Players.LocalPlayer:GetMouse()
+
+	Library.__index = Library
+	Library.Pages.__index = Library.Pages
+	Library.Sections.__index = Library.Sections
+
+	-- // Utility Functions
+	function Library:Connection(signal, Callback)
+		return signal:Connect(Callback)
+	end
+
+	function Library:Round(Number, Float)
+		return Float * math.floor(Number / Float)
+	end
+
+	function Library.NextFlag()
+		Library.UnNamedFlags = Library.UnNamedFlags + 1
+		return string.format("%.14g", Library.UnNamedFlags)
+	end
+
+	function Library:SetOpen(bool)
+		if typeof(bool) == 'boolean' then
+			Library.Open = bool;
+			if Library.Open then
+				Library.Holder.Visible = true
+				TweenService:Create(Library.Holder, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, Library.OldSize.X.Offset, 0, Library.OldSize.Y.Offset)}):Play()
+			else
+				TweenService:Create(Library.Holder, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, 0, 0, 20)}):Play()
+				task.wait(0.25)
+				Library.Holder.Visible = false
+			end
+		end
+	end
+
+	function Library:IsMouseOverFrame(Frame)
+		local AbsPos, AbsSize = Frame.AbsolutePosition, Frame.AbsoluteSize;
+		if Mouse.X >= AbsPos.X and Mouse.X <= AbsPos.X + AbsSize.X and Mouse.Y >= AbsPos.Y and Mouse.Y <= AbsPos.Y + AbsSize.Y then
+			return true;
+		end;
+		return false;
+	end
+
+    -- // Color Picker Internal Logic
+    function Library:NewPicker(name, default, parent, count, flag, callback)
+        local ColorpickerFrame = Instance.new("TextButton")
+        ColorpickerFrame.Name = "Colorpicker_frame"
+        ColorpickerFrame.BackgroundColor3 = default
+        ColorpickerFrame.BorderSizePixel = 0
+        ColorpickerFrame.Position = count == 1 and UDim2.new(1, -(count * 20), 0.5, 0) or UDim2.new(1, -(count * 20) - (count * 4), 0.5, 0)
+        ColorpickerFrame.Size = UDim2.new(0, 20, 0, 20)
+        ColorpickerFrame.AnchorPoint = Vector2.new(0, 0.5)
+        ColorpickerFrame.Text = ""
+        ColorpickerFrame.Parent = parent
+
+        local UICorner = Instance.new("UICorner", ColorpickerFrame)
+        UICorner.CornerRadius = UDim.new(0, 4)
+
+        local Colorpicker = Instance.new("TextButton")
+        Colorpicker.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        Colorpicker.Size = UDim2.new(0, 180, 0, 180)
+        Colorpicker.Parent = Library.ScreenGUI
+        Colorpicker.Visible = false
+        Colorpicker.Text = ""
+
+        -- Simplified hue/sat logic placeholder (refer to original for full math)
+        ColorpickerFrame.MouseButton1Down:Connect(function()
+            Colorpicker.Visible = not Colorpicker.Visible
+            Colorpicker.Position = UDim2.new(0, ColorpickerFrame.AbsolutePosition.X - 100, 0, ColorpickerFrame.AbsolutePosition.Y + 25)
+        end)
+
+        local types = {}
+        function types:Set(color) 
+            ColorpickerFrame.BackgroundColor3 = color 
+            callback(color)
+        end
+        return types, Colorpicker
+    end
+
+    -- // Notification System
+	function Library:Notification(message, duration)
+		local NewInd = Instance.new("Frame", Library.ScreenGUI)
+		NewInd.Size = UDim2.fromOffset(200, 25)
+        NewInd.BackgroundColor3 = Color3.fromRGB(30,30,30)
+        local l = Instance.new("TextLabel", NewInd)
+        l.Text = message
+        l.Size = UDim2.new(1,0,1,0)
+        l.TextColor3 = Color3.new(1,1,1)
+        task.delay(duration, function() NewInd:Destroy() end)
+	end
+
+	-- // Window Creator
+	function Library:New(Properties)
+		local Window = {
+			Size = Properties.Size or UDim2.new(0, 600, 0, 450),
+			Pages = {},
+			Dragging = { false, UDim2.new(0, 0, 0, 0) },
+			Elements = {},
+		}
+
+		local ScreenGui = Instance.new('ScreenGui', game.CoreGui)
+		Library.ScreenGUI = ScreenGui
+
+		local Outline = Instance.new('Frame', ScreenGui)
+		Outline.Name = "Outline"
+		Outline.Position = UDim2.new(0.5, 0, 0.5, 0)
+		Outline.Size = UDim2.new(0, 0, 0, 40)
+		Outline.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		Outline.AnchorPoint = Vector2.new(0.5, 0.5)
+        Outline.BorderSizePixel = 0
+		Library.Holder = Outline
+		Library.OldSize = Window.Size
+
+		local Inline = Instance.new('Frame', Outline)
+		Inline.Size = UDim2.new(1, -2, 1, -2)
+		Inline.Position = UDim2.new(0, 1, 0, 1)
+		Inline.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        Inline.BorderSizePixel = 0
+
+		local Tabs = Instance.new('Frame', Inline)
+		Tabs.Position = UDim2.new(0, 5, 0, 10)
+		Tabs.Size = UDim2.new(0, 140, 1, -20)
+		Tabs.BackgroundTransparency = 1
+
+		local UIListLayout = Instance.new('UIListLayout', Tabs)
+		UIListLayout.Padding = UDim.new(0, 4)
+
+		local Holder = Instance.new('Frame', Inline)
+		Holder.Position = UDim2.new(0, 150, 0, 0)
+		Holder.Size = UDim2.new(1, -150, 1, 0)
+		Holder.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        Holder.BorderSizePixel = 0
+
+		Window.Elements = { TabHolder = Tabs, Holder = Holder }
+
+        -- Dragging Logic
+        local DragBtn = Instance.new("TextButton", Inline)
+        DragBtn.Size = UDim2.new(1,0,0,30)
+        DragBtn.BackgroundTransparency = 1
+        DragBtn.Text = ""
+
+		Library:Connection(DragBtn.MouseButton1Down, function()
+			local Location = UserInputService:GetMouseLocation()
+			Window.Dragging[1] = true
+			Window.Dragging[2] = UDim2.new(0, Location.X - Outline.AbsolutePosition.X, 0, Location.Y - Outline.AbsolutePosition.Y)
+		end)
+		Library:Connection(UserInputService.InputEnded, function(Input)
+			if Input.UserInputType == Enum.UserInputType.MouseButton1 then Window.Dragging[1] = false end
+		end)
+		Library:Connection(UserInputService.InputChanged, function()
+			if Window.Dragging[1] then
+				local Location = UserInputService:GetMouseLocation()
+				Outline.Position = UDim2.new(0, Location.X - Window.Dragging[2].X.Offset + (Outline.Size.X.Offset * Outline.AnchorPoint.X), 0, Location.Y - Window.Dragging[2].Y.Offset + (Outline.Size.Y.Offset * Outline.AnchorPoint.Y))
+			end
+		end)
+
+		TweenService:Create(Outline, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {Size = Window.Size}):Play()
+		return setmetatable(Window, Library)
+	end
+
+    function Library:Seperator(Properties)
+        local TextLabel = Instance.new('TextLabel', self.Elements.TabHolder)
+        TextLabel.Size = UDim2.new(1,0,0,20)
+        TextLabel.BackgroundTransparency = 1
+        TextLabel.Text = Properties.Name
+        TextLabel.TextColor3 = Color3.fromRGB(150,150,150)
+        TextLabel.Font = Enum.Font.Gotham
+        TextLabel.TextSize = 12
+        TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+    end
+
+	function Library:Page(Properties)
+		local Page = { Name = Properties.Name, Window = self, Open = false, Sections = {}, Elements = {} }
+		
+		local TabButton = Instance.new('TextButton', self.Elements.TabHolder)
+		TabButton.Size = UDim2.new(1, 0, 0, 30)
+		TabButton.BackgroundTransparency = 1
+		TabButton.Text = Page.Name
+		TabButton.TextColor3 = Color3.fromRGB(120, 120, 120)
+        TabButton.Font = Enum.Font.Gotham
+
+		local NewPage = Instance.new('Frame', self.Elements.Holder)
+		NewPage.Size = UDim2.new(1, -20, 1, -20)
+		NewPage.Position = UDim2.new(0, 10, 0, 10)
+		NewPage.BackgroundTransparency = 1
+		NewPage.Visible = false
+
+		local Left = Instance.new('Frame', NewPage)
+		Left.Size = UDim2.new(0.5, -5, 1, 0)
+		Left.BackgroundTransparency = 1
+        Instance.new("UIListLayout", Left).Padding = UDim.new(0, 8)
+
+		local Right = Instance.new('Frame', NewPage)
+		Right.Position = UDim2.new(0.5, 5, 0, 0)
+		Right.Size = UDim2.new(0.5, -5, 1, 0)
+		Right.BackgroundTransparency = 1
+        Instance.new("UIListLayout", Right).Padding = UDim.new(0, 8)
+
+		function Page:Turn(bool)
+			Page.Open = bool
+			NewPage.Visible = bool
+			TabButton.TextColor3 = bool and Color3.new(1, 1, 1) or Color3.fromRGB(120, 120, 120)
+		end
+
+		TabButton.MouseButton1Click:Connect(function()
+			for _, p in pairs(self.Pages) do p:Turn(false) end
+			Page:Turn(true)
+		end)
+
+		if #self.Pages == 0 then Page:Turn(true) end
+		table.insert(self.Pages, Page)
+		Page.Elements = { Left = Left, Right = Right }
+		return setmetatable(Page, Library.Pages)
+	end
+
+	function Library.Pages:Section(Properties)
+		local Section = { Name = Properties.Name, Page = self, Side = (Properties.Side or "Left"):lower() }
+		local Parent = Section.Side == "left" and self.Elements.Left or self.Elements.Right
+		
+		local NewSection = Instance.new('Frame', Parent)
+		NewSection.Size = UDim2.new(1, 0, 0, Properties.Size or 100)
+		NewSection.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        
+        local Title = Instance.new("TextLabel", NewSection)
+        Title.Text = "  " .. Section.Name
+        Title.Size = UDim2.new(1,0,0,20)
+        Title.BackgroundColor3 = Color3.fromRGB(35,35,35)
+        Title.TextColor3 = Color3.new(1,1,1)
+        Title.BorderSizePixel = 0
+        Title.TextXAlignment = "Left"
+
+		local Content = Instance.new('Frame', NewSection)
+		Content.Position = UDim2.new(0, 5, 0, 25)
+		Content.Size = UDim2.new(1, -10, 1, -30)
+		Content.BackgroundTransparency = 1
+		Instance.new('UIListLayout', Content).Padding = UDim.new(0, 5)
+
+		Section.Elements = { SectionContent = Content }
+		return setmetatable(Section, Library.Sections)
+	end
+
+	function Library.Sections:Toggle(Properties)
+		local Toggle = { State = Properties.Default or false, Callback = Properties.Callback or function() end, Flag = Properties.Flag or Library.NextFlag() }
+		
+		local Btn = Instance.new('TextButton', self.Elements.SectionContent)
+		Btn.Size = UDim2.new(1, 0, 0, 20)
+		Btn.BackgroundTransparency = 1
+		Btn.Text = Properties.Name
+		Btn.TextColor3 = Toggle.State and Library.Accent or Color3.new(0.6, 0.6, 0.6)
+        Btn.TextXAlignment = "Left"
+
+		Btn.MouseButton1Click:Connect(function()
+			Toggle.State = not Toggle.State
+			Btn.TextColor3 = Toggle.State and Library.Accent or Color3.new(0.6, 0.6, 0.6)
+			Toggle.Callback(Toggle.State)
+		end)
+		return Toggle
+	end
+
+	function Library.Sections:Slider(Properties)
+		local Slider = { Min = Properties.Min or 0, Max = Properties.Max or 100, State = Properties.Default or 50, Callback = Properties.Callback or function() end }
+		
+		local Frame = Instance.new('Frame', self.Elements.SectionContent)
+		Frame.Size = UDim2.new(1, 0, 0, 30)
+		Frame.BackgroundTransparency = 1
+		
+		local Label = Instance.new('TextLabel', Frame)
+		Label.Text = Properties.Name .. ": " .. Slider.State
+		Label.Size = UDim2.new(1,0,0,15)
+        Label.BackgroundTransparency = 1
+        Label.TextColor3 = Color3.new(1,1,1)
+
+		local Bar = Instance.new('Frame', Frame)
+		Bar.Size = UDim2.new(1, 0, 0, 5)
+		Bar.Position = UDim2.new(0, 0, 0, 20)
+		Bar.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+
+		local Fill = Instance.new('Frame', Bar)
+		Fill.Size = UDim2.new((Slider.State - Slider.Min)/(Slider.Max - Slider.Min), 0, 1, 0)
+		Fill.BackgroundColor3 = Library.Accent
+
+		-- Simplified Slider Logic
+		Bar.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				local move; move = UserInputService.InputChanged:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseMovement then
+						local percent = math.clamp((UserInputService:GetMouseLocation().X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
+						local val = math.floor(Slider.Min + (Slider.Max - Slider.Min) * percent)
+						Label.Text = Properties.Name .. ": " .. val
+						Fill.Size = UDim2.new(percent, 0, 1, 0)
+						Slider.Callback(val)
+					end
+				end)
+				UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then move:Disconnect() end end)
+			end
+		end)
+	end
+
+	function Library.Sections:Button(Properties)
+		local Btn = Instance.new('TextButton', self.Elements.SectionContent)
+		Btn.Size = UDim2.new(1, 0, 0, 25)
+		Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		Btn.Text = Properties.Name
+		Btn.TextColor3 = Color3.new(1, 1, 1)
+		Btn.MouseButton1Click:Connect(Properties.Callback or function() end)
+	end
+end
+
+return Library
