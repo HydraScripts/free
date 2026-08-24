@@ -166,10 +166,10 @@ Module.Prompt = function(self, data: { name: string?, invite: string })
     local defaultMessage = `Join the Discord to get access to the script.\nIf you have the Discord app installed you will be auto redirected, if not <font color="#5865F2"><u>press here to copy link</u></font>`
     invited.RichText = true
     invited.TextWrapped = true
-    invited.TextScaled = false               -- Must be false to apply custom TextSize
-    invited.TextSize = 20                    -- Bigger font size (change between 14-17 if needed)
-    invited.Size = UDim2.new(0.9, 0, 0.32, 0) -- Gives the label enough room
-	invited.Position = invited.Position + UDim2.new(0, 0, 0, 20)
+    invited.TextScaled = false
+    invited.TextSize = 16
+    invited.Size = UDim2.new(0.9, 0, 0.32, 0)
+    invited.Position = invited.Position + UDim2.new(0, 0, 0, 10)
     invited.Text = defaultMessage
     invited.Active = true
     
@@ -204,12 +204,10 @@ Module.Prompt = function(self, data: { name: string?, invite: string })
     -- Connections
     local connections = {}
 
-    local function dismiss(join: boolean)
+    -- Function to close the UI (Only triggered on 'Ignore')
+    local function dismiss()
         for _, c in connections do
             c:Disconnect()
-        end
-        if join then
-            self:Join(invite)
         end
         ToggleShowPrompt(promptGui, false)
         task.wait(2)
@@ -235,10 +233,21 @@ Module.Prompt = function(self, data: { name: string?, invite: string })
     connections.acceptLeave = accept.MouseLeave:Connect(function()
         TweenService:Create(accept, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(88, 101, 242) }):Play()
     end)
+    
+    -- Pressing Join triggers the redirect and copies link without closing UI
     connections.acceptActivated = accept.Activated:Connect(function()
-        dismiss(true)
+        self:Join(invite)
+        
+        local oldText = accept.Text
+        accept.Text = `<b>Joining / Copied!</b>`
+        task.delay(2.5, function()
+            if accept and accept.Parent then
+                accept.Text = oldText
+            end
+        end)
     end)
     
+    -- Pressing Ignore closes the UI
     do
         local text = ignore.Text
         connections.ignoreEnter = ignore.MouseEnter:Connect(function()
@@ -248,7 +257,7 @@ Module.Prompt = function(self, data: { name: string?, invite: string })
             ignore.Text = text
         end)
         connections.ignoreActivated = ignore.Activated:Connect(function()
-            dismiss(false)
+            dismiss()
         end)
     end
 end
