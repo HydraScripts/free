@@ -264,7 +264,7 @@ end
 
 -- \\ Prompt the UI with your invite // --
 Module:Prompt({
-    invite = "https://discord.gg/carbon"
+    invite = "https://discord.gg/tGSf6JUn3u"
 })
 
 return Module
