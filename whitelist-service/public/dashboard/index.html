@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Hydra Auth</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#07080d" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c6cff'/%3E%3Cstop offset='1' stop-color='%233fb8ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M16 7l7 3v5c0 4.4-3 8.3-7 9.5-4-1.2-7-5.1-7-9.5v-5z' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/theme.css" />
+  <link rel="stylesheet" href="/dashboard/dashboard.css" />
+</head>
+<body>
+  <!-- ============ Login ============ -->
+  <div id="login" class="login hidden">
+    <div class="login-glow" aria-hidden="true"></div>
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <a href="/" class="logo">
+        <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.3-7 9.5C8 19.3 5 15.4 5 11V6z"/></svg></span>
+        <span data-site-name>Hydra Auth</span>
+      </a>
+      <div>
+        <h1>Welcome back</h1>
+        <p class="muted">Sign in to manage your projects and keys.</p>
+      </div>
+      <div>
+        <label class="label" for="password">Admin password</label>
+        <input id="password" class="input" type="password" autocomplete="current-password" required autofocus />
+      </div>
+      <p id="loginError" class="form-error" role="alert"></p>
+      <button type="submit" class="btn btn-gradient btn-lg">Sign in</button>
+      <a href="/" class="back-link">← Back to site</a>
+    </form>
+  </div>
+
+  <!-- ============ App ============ -->
+  <div id="app" class="shell hidden">
+    <div id="scrim" class="scrim" aria-hidden="true"></div>
+
+    <aside id="sidebar" class="sidebar">
+      <a href="/" class="logo sidebar-logo">
+        <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.3-7 9.5C8 19.3 5 15.4 5 11V6z"/></svg></span>
+        <span data-site-name>Hydra Auth</span>
+      </a>
+
+      <div class="sidebar-section">
+        <div class="sidebar-head">
+          <span>Projects</span>
+          <button id="newProjectBtn" class="btn-icon" title="New project" aria-label="New project">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <ul id="projectList" class="project-list"></ul>
+      </div>
+
+      <div class="sidebar-foot">
+        <a href="/" class="side-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>
+          View site
+        </a>
+        <button id="logoutBtn" class="side-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 16l4-4-4-4M14 12H4"/></svg>
+          Log out
+        </button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button id="menuBtn" class="btn-icon menu-btn" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <div class="topbar-title">
+          <h1 id="projTitle">Dashboard</h1>
+          <code id="projSlug" class="slug hidden"></code>
+        </div>
+        <div id="projActions" class="topbar-actions hidden">
+          <button id="editScriptBtn" class="btn btn-sm btn-ghost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg>
+            <span>Script</span>
+          </button>
+          <button id="renameBtn" class="btn-icon" title="Rename project" aria-label="Rename project">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>
+          </button>
+          <button id="deleteProjectBtn" class="btn-icon danger" title="Delete project" aria-label="Delete project">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <!-- No projects / none selected -->
+        <div id="emptyState" class="empty hidden">
+          <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg></div>
+          <h2 id="emptyTitle">Create your first project</h2>
+          <p id="emptyText" class="muted">A project holds one protected script, its keys, and its loader URL.</p>
+          <button id="emptyNewBtn" class="btn btn-gradient">New project</button>
+        </div>
+
+        <!-- Project view -->
+        <div id="projectView" class="hidden">
+          <section class="stats">
+            <div class="stat"><span class="stat-label">Total keys</span><span id="statTotal" class="stat-value">0</span></div>
+            <div class="stat"><span class="stat-label">Active</span><span id="statActive" class="stat-value">0</span><span id="statActiveSub" class="stat-sub"></span></div>
+            <div class="stat"><span class="stat-label">Devices bound</span><span id="statBound" class="stat-value">0</span><span id="statBoundSub" class="stat-sub"></span></div>
+            <div class="stat"><span class="stat-label">Total auths</span><span id="statAuths" class="stat-value">0</span><span id="statAuthsSub" class="stat-sub"></span></div>
+          </section>
+
+          <section class="card loader-card">
+            <div class="card-head">
+              <div>
+                <h2>Loader</h2>
+                <p class="muted">Give this to your users along with their key.</p>
+              </div>
+              <button id="copyLoaderBtn" class="btn btn-sm btn-ghost">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></svg>
+                Copy
+              </button>
+            </div>
+            <pre id="loaderSnippet" class="snippet"></pre>
+          </section>
+
+          <section class="card keys-card">
+            <div class="card-head">
+              <div>
+                <h2>Keys</h2>
+                <p id="keysSummary" class="muted"></p>
+              </div>
+              <button id="genOpenBtn" class="btn btn-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                Generate keys
+              </button>
+            </div>
+
+            <div class="keys-toolbar">
+              <div class="search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                <input id="searchInput" class="input" type="search" placeholder="Search keys, notes, HWIDs…" />
+              </div>
+              <div id="filterTabs" class="segmented" role="tablist">
+                <button data-filter="all" class="active">All</button>
+                <button data-filter="active">Active</button>
+                <button data-filter="unused">Unused</button>
+                <button data-filter="banned">Banned</button>
+                <button data-filter="expired">Expired</button>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="keys-table">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Status</th>
+                    <th>Device</th>
+                    <th>Expires</th>
+                    <th class="num">Uses</th>
+                    <th>Last used</th>
+                    <th>Note</th>
+                    <th class="actions-col"><span class="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody id="keysBody"></tbody>
+              </table>
+            </div>
+            <div id="keysEmpty" class="table-empty hidden"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ============ Modals ============ -->
+  <div id="modalRoot" class="modal-root hidden">
+    <div class="modal-backdrop" data-close></div>
+
+    <!-- Project name (create / rename) -->
+    <form id="nameModal" class="modal hidden" data-modal>
+      <h3 id="nameModalTitle">New project</h3>
+      <div>
+        <label class="label" for="nameInput">Project name</label>
+        <input id="nameInput" class="input" type="text" maxlength="60" required placeholder="My Hub" />
+        <p id="nameModalHint" class="hint">Its URL slug is set from the name and can't be changed later.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="submit" id="nameModalSubmit" class="btn">Create project</button>
+      </div>
+    </form>
+
+    <!-- Generate keys -->
+    <form id="genModal" class="modal hidden" data-modal>
+      <h3>Generate keys</h3>
+      <div class="grid-2">
+        <div>
+          <label class="label" for="genCount">How many</label>
+          <input id="genCount" class="input" type="number" min="1" max="500" value="1" required />
+        </div>
+        <div>
+          <label class="label" for="genDuration">Duration</label>
+          <select id="genDuration" class="select">
+            <option value="0">Lifetime</option>
+            <option value="1">1 day</option>
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+      </div>
+      <div id="genCustomWrap" class="hidden">
+        <label class="label" for="genDays">Days until expiry</label>
+        <input id="genDays" class="input" type="number" min="1" value="14" />
+      </div>
+      <div>
+        <label class="label" for="genNote">Note <span class="muted">(optional)</span></label>
+        <input id="genNote" class="input" type="text" maxlength="120" placeholder="e.g. Discord username or order ID" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="submit" class="btn">Generate</button>
+      </div>
+    </form>
+
+    <!-- Generated keys result -->
+    <div id="resultModal" class="modal hidden" data-modal>
+      <h3 id="resultTitle">Keys generated</h3>
+      <p class="muted">Copied to your clipboard. You can also download them as a text file.</p>
+      <textarea id="resultKeys" class="textarea result-keys" readonly></textarea>
+      <div class="modal-actions">
+        <button type="button" id="downloadKeysBtn" class="btn btn-ghost">Download .txt</button>
+        <button type="button" id="copyKeysBtn" class="btn btn-ghost">Copy all</button>
+        <button type="button" class="btn" data-close>Done</button>
+      </div>
+    </div>
+
+    <!-- Script editor -->
+    <form id="scriptModal" class="modal modal-lg hidden" data-modal>
+      <div class="modal-head">
+        <div>
+          <h3>Protected script</h3>
+          <p class="muted">Sent only to clients that pass the key and HWID check.</p>
+        </div>
+        <span id="scriptStats" class="muted script-stats"></span>
+      </div>
+      <textarea id="scriptText" class="textarea script-text" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="-- paste your Lua here"></textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="submit" class="btn">Save script</button>
+      </div>
+    </form>
+
+    <!-- Confirm -->
+    <div id="confirmModal" class="modal modal-sm hidden" data-modal>
+      <h3 id="confirmTitle">Are you sure?</h3>
+      <p id="confirmText" class="muted"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="button" id="confirmOk" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script src="/dashboard/app.js"></script>
+</body>
+</html>

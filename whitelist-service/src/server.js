@@ -31,7 +31,12 @@ app.use('/', cors(), loaderRouter);
 
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
-// Serve the admin dashboard.
+// Public site info used by the landing page and dashboard for branding.
+app.get('/api/site', (_req, res) => {
+  res.json({ name: process.env.SITE_NAME || 'Hydra Auth' });
+});
+
+// Landing page at /, admin dashboard at /dashboard.
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const port = process.env.PORT || 3000;

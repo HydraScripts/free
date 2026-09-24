@@ -3,98 +3,219 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Whitelist Admin</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Hydra Auth — Script Whitelisting</title>
+  <meta name="description" content="HWID-locked key authentication for your Roblox scripts. Generate keys, lock them to one machine, and deliver your script only to whitelisted users." />
+  <meta name="theme-color" content="#07080d" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c6cff'/%3E%3Cstop offset='1' stop-color='%233fb8ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M16 7l7 3v5c0 4.4-3 8.3-7 9.5-4-1.2-7-5.1-7-9.5v-5z' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/theme.css" />
+  <link rel="stylesheet" href="/landing.css" />
 </head>
 <body>
-  <!-- Login -->
-  <div id="login" class="login-wrap">
-    <form id="loginForm" class="card login-card">
-      <h1>Whitelist Admin</h1>
-      <p class="muted">Sign in to manage projects and keys.</p>
-      <input id="password" type="password" placeholder="Admin password" autocomplete="current-password" />
-      <button type="submit">Sign in</button>
-      <p id="loginError" class="error"></p>
-    </form>
-  </div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
 
-  <!-- Dashboard -->
-  <div id="app" class="hidden">
-    <header class="topbar">
-      <strong>Whitelist Admin</strong>
-      <div class="spacer"></div>
-      <button id="logout" class="ghost">Log out</button>
-    </header>
-
-    <main class="layout">
-      <aside class="sidebar">
-        <div class="sidebar-head">
-          <span>Projects</span>
-          <button id="newProject" class="ghost small">+ New</button>
-        </div>
-        <ul id="projectList" class="project-list"></ul>
-      </aside>
-
-      <section class="content">
-        <div id="empty" class="muted pad">Select or create a project to begin.</div>
-
-        <div id="projectView" class="hidden">
-          <div class="project-header">
-            <div>
-              <h2 id="projTitle"></h2>
-              <code id="projSlug" class="muted"></code>
-            </div>
-            <div class="row-actions">
-              <button id="editScript">Edit script</button>
-              <button id="deleteProject" class="danger">Delete project</button>
-            </div>
-          </div>
-
-          <div class="card loader-box">
-            <div class="loader-head">Loader snippet</div>
-            <pre id="loaderSnippet"></pre>
-          </div>
-
-          <div class="keys-toolbar card">
-            <label>Generate
-              <input id="genCount" type="number" min="1" max="500" value="1" />
-              key(s)
-            </label>
-            <label>expiring in
-              <input id="genDays" type="number" min="0" value="0" />
-              days <span class="muted">(0 = lifetime)</span>
-            </label>
-            <input id="genNote" type="text" placeholder="Note (optional)" />
-            <button id="genKeys">Generate</button>
-          </div>
-
-          <table class="keys-table">
-            <thead>
-              <tr>
-                <th>Key</th><th>HWID</th><th>Status</th><th>Expires</th>
-                <th>Uses</th><th>Note</th><th></th>
-              </tr>
-            </thead>
-            <tbody id="keysBody"></tbody>
-          </table>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <!-- Script editor modal -->
-  <div id="scriptModal" class="modal hidden">
-    <div class="modal-card">
-      <h3>Protected script source</h3>
-      <p class="muted">This Lua is returned to a client only after its key + HWID pass authentication.</p>
-      <textarea id="scriptText" spellcheck="false"></textarea>
-      <div class="row-actions end">
-        <button id="scriptCancel" class="ghost">Cancel</button>
-        <button id="scriptSave">Save</button>
-      </div>
+  <!-- Nav -->
+  <header class="nav">
+    <div class="container nav-inner">
+      <a href="/" class="logo">
+        <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.3-7 9.5C8 19.3 5 15.4 5 11V6z"/></svg></span>
+        <span data-site-name>Hydra Auth</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#developers">Developers</a>
+      </nav>
+      <a href="/dashboard/" class="btn btn-sm btn-ghost">Dashboard</a>
     </div>
-  </div>
+  </header>
 
-  <script src="app.js"></script>
+  <main>
+    <!-- Hero -->
+    <section class="hero container">
+      <div class="hero-copy">
+        <a href="#how" class="pill">
+          <span class="status-dot" data-status-dot></span>
+          <span data-status-text>Checking status…</span>
+        </a>
+        <h1>Whitelist your scripts.<br /><span class="grad">One key, one machine.</span></h1>
+        <p class="lead">
+          HWID-locked key authentication for Roblox scripts. Generate keys, bind each one to a
+          single device on first run, and serve your script only to users who pass the check.
+        </p>
+        <div class="hero-cta">
+          <a href="/dashboard/" class="btn btn-lg btn-gradient">
+            Open dashboard
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a href="#how" class="btn btn-lg btn-ghost">See how it works</a>
+        </div>
+        <ul class="hero-points">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Self-hosted</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Works on any executor</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>Two-line loader</li>
+        </ul>
+      </div>
+
+      <div class="hero-visual">
+        <div class="window">
+          <div class="window-bar">
+            <span></span><span></span><span></span>
+            <div class="window-title">executor.lua</div>
+          </div>
+          <pre class="code"><span class="c-var">_G</span>.Key = <span class="c-str">"8KQ2-7MXP-RT4V-NW9C"</span>
+<span class="c-fn">loadstring</span>(game:<span class="c-fn">HttpGet</span>(
+  <span class="c-str">"<span data-origin>https://your-domain.com</span>/loader/my-hub"</span>
+))()</pre>
+        </div>
+
+        <div class="window window-log">
+          <div class="window-bar">
+            <span></span><span></span><span></span>
+            <div class="window-title">auth log</div>
+          </div>
+          <ol class="log" data-log>
+            <li><span class="t">POST</span> /api/v1/auth</li>
+            <li><span class="k">key</span> 8KQ2-7MXP-RT4V-NW9C</li>
+            <li><span class="k">hwid</span> 4f1e9a2c-…-b7d03e</li>
+            <li class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>key valid · hwid bound · script delivered</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="section container">
+      <div class="section-head">
+        <p class="eyebrow">Features</p>
+        <h2>Everything you need to gate a script</h2>
+        <p class="section-lead">Stop key sharing without shipping your source to everyone who asks.</p>
+      </div>
+
+      <div class="features">
+        <article class="feature">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div>
+          <h3>HWID locking</h3>
+          <p>Each key binds to the first device that uses it. Anyone else who tries the key is turned away.</p>
+        </article>
+        <article class="feature">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg></div>
+          <h3>Bulk key generation</h3>
+          <p>Create up to 500 keys at once, with an optional note and expiry. Copy or download them as a file.</p>
+        </article>
+        <article class="feature">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Timed or lifetime</h3>
+          <p>Sell 1-day, 30-day, or lifetime access. Expired keys stop working on their own.</p>
+        </article>
+        <article class="feature">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg></div>
+          <h3>Instant revocation</h3>
+          <p>Ban a key, reset its HWID, or delete it. The change applies the next time the user runs the loader.</p>
+        </article>
+        <article class="feature">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <h3>Multiple projects</h3>
+          <p>Run several scripts from one dashboard. Each project has its own keys, script, and loader URL.</p>
+        </article>
+        <article class="feature">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.3-7 9.5C8 19.3 5 15.4 5 11V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Rate limited</h3>
+          <p>The auth and login endpoints are rate limited, so guessing keys or the admin password doesn't scale.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how" class="section container">
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2>Live in three steps</h2>
+      </div>
+
+      <ol class="steps">
+        <li class="step">
+          <span class="step-num">1</span>
+          <h3>Create a project</h3>
+          <p>Name it in the dashboard and paste in the Lua you want to protect. It stays on your server.</p>
+        </li>
+        <li class="step">
+          <span class="step-num">2</span>
+          <h3>Hand out keys</h3>
+          <p>Generate keys and give each buyer one, along with your project's two-line loader.</p>
+        </li>
+        <li class="step">
+          <span class="step-num">3</span>
+          <h3>Users run the loader</h3>
+          <p>The loader sends the key and HWID. If both check out, your script comes back and runs.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- Developers -->
+    <section id="developers" class="section container dev">
+      <div class="dev-copy">
+        <p class="eyebrow">Developers</p>
+        <h2>A plain JSON API</h2>
+        <p class="section-lead">
+          The loader is one POST request. You can call the same endpoint from your own UI, key
+          checker, or bot.
+        </p>
+        <ul class="errors">
+          <li><code>invalid_key</code><span>Key doesn't exist for this project</span></li>
+          <li><code>hwid_mismatch</code><span>Key is bound to another device</span></li>
+          <li><code>key_expired</code><span>Key is past its expiry date</span></li>
+          <li><code>key_banned</code><span>Key was banned from the dashboard</span></li>
+          <li><code>rate_limited</code><span>Too many attempts, try again shortly</span></li>
+        </ul>
+      </div>
+      <div class="window">
+        <div class="window-bar">
+          <span></span><span></span><span></span>
+          <div class="window-title">POST /api/v1/auth</div>
+        </div>
+        <pre class="code"><span class="c-com">// request</span>
+{
+  <span class="c-key">"key"</span>:     <span class="c-str">"8KQ2-7MXP-RT4V-NW9C"</span>,
+  <span class="c-key">"hwid"</span>:    <span class="c-str">"4f1e9a2c-…-b7d03e"</span>,
+  <span class="c-key">"project"</span>: <span class="c-str">"my-hub"</span>
+}
+
+<span class="c-com">// 200 OK</span>
+{
+  <span class="c-key">"ok"</span>:         <span class="c-bool">true</span>,
+  <span class="c-key">"project"</span>:    <span class="c-str">"my-hub"</span>,
+  <span class="c-key">"expires_at"</span>: <span class="c-bool">null</span>,
+  <span class="c-key">"script"</span>:     <span class="c-str">"-- your protected Lua"</span>
+}</pre>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="container">
+      <div class="cta">
+        <h2>Ready to lock down your script?</h2>
+        <p>Sign in, create a project, and have your first key in under a minute.</p>
+        <a href="/dashboard/" class="btn btn-lg btn-gradient">Open dashboard</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <span class="logo"><span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.3-7 9.5C8 19.3 5 15.4 5 11V6z"/></svg></span><span data-site-name>Hydra Auth</span></span>
+      <span class="muted">© <span data-year></span> <span data-site-name>Hydra Auth</span></span>
+      <nav class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#developers">API</a>
+        <a href="/dashboard/">Dashboard</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="/landing.js"></script>
 </body>
 </html>

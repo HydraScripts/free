@@ -14,7 +14,11 @@ dashboard and a drop-in Lua loader.
   and loader URL.
 - **Key management** — bulk-generate keys, optional expiry (or lifetime), notes,
   ban/unban, delete, and per-key usage counts.
-- **Admin dashboard** — a single-page web UI (no build step).
+- **Public landing page** at `/`: hero, features, how it works, API docs, and a
+  live status indicator.
+- **Admin dashboard** at `/dashboard`: per-project stats, key search and status
+  filters, copy buttons, bulk generation with .txt download, a script editor, and
+  a mobile layout. No build step.
 - **Lua loader** — a small snippet users run; it computes an HWID, authenticates,
   and executes the protected script returned by the server.
 - **Rate limiting** on the auth and login endpoints.
@@ -29,8 +33,12 @@ cp .env.example .env
 npm start
 ```
 
-Open <http://localhost:3000>, log in with `ADMIN_PASSWORD`, create a project,
-paste your Lua into **Edit script**, and generate keys.
+Open <http://localhost:3000> for the public site, or
+<http://localhost:3000/dashboard> to log in with `ADMIN_PASSWORD`. Create a
+project, paste your Lua in under **Script**, and generate keys.
+
+To rebrand, set `SITE_NAME` in `.env`. The landing page and dashboard read it from
+`/api/site`.
 
 ## How it fits together
 
