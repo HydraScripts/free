@@ -25,6 +25,14 @@ dashboard and a drop-in Lua loader.
 
 ## Quick start
 
+**Windows:** double-click `start.bat`. **Mac/Linux:** run `./start.sh`.
+
+The script checks for Node.js, installs dependencies, asks you to choose an
+admin password on first run (it generates `SESSION_SECRET` for you), starts the
+server, and opens the dashboard. Keep the window open while you test.
+
+Or do it by hand:
+
 ```bash
 cd whitelist-service
 npm install
