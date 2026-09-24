@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Whitelist Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Login -->
+  <div id="login" class="login-wrap">
+    <form id="loginForm" class="card login-card">
+      <h1>Whitelist Admin</h1>
+      <p class="muted">Sign in to manage projects and keys.</p>
+      <input id="password" type="password" placeholder="Admin password" autocomplete="current-password" />
+      <button type="submit">Sign in</button>
+      <p id="loginError" class="error"></p>
+    </form>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <strong>Whitelist Admin</strong>
+      <div class="spacer"></div>
+      <button id="logout" class="ghost">Log out</button>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <span>Projects</span>
+          <button id="newProject" class="ghost small">+ New</button>
+        </div>
+        <ul id="projectList" class="project-list"></ul>
+      </aside>
+
+      <section class="content">
+        <div id="empty" class="muted pad">Select or create a project to begin.</div>
+
+        <div id="projectView" class="hidden">
+          <div class="project-header">
+            <div>
+              <h2 id="projTitle"></h2>
+              <code id="projSlug" class="muted"></code>
+            </div>
+            <div class="row-actions">
+              <button id="editScript">Edit script</button>
+              <button id="deleteProject" class="danger">Delete project</button>
+            </div>
+          </div>
+
+          <div class="card loader-box">
+            <div class="loader-head">Loader snippet</div>
+            <pre id="loaderSnippet"></pre>
+          </div>
+
+          <div class="keys-toolbar card">
+            <label>Generate
+              <input id="genCount" type="number" min="1" max="500" value="1" />
+              key(s)
+            </label>
+            <label>expiring in
+              <input id="genDays" type="number" min="0" value="0" />
+              days <span class="muted">(0 = lifetime)</span>
+            </label>
+            <input id="genNote" type="text" placeholder="Note (optional)" />
+            <button id="genKeys">Generate</button>
+          </div>
+
+          <table class="keys-table">
+            <thead>
+              <tr>
+                <th>Key</th><th>HWID</th><th>Status</th><th>Expires</th>
+                <th>Uses</th><th>Note</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="keysBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Script editor modal -->
+  <div id="scriptModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Protected script source</h3>
+      <p class="muted">This Lua is returned to a client only after its key + HWID pass authentication.</p>
+      <textarea id="scriptText" spellcheck="false"></textarea>
+      <div class="row-actions end">
+        <button id="scriptCancel" class="ghost">Cancel</button>
+        <button id="scriptSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
