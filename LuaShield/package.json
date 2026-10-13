@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"server/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\"",
-    "format:check": "prettier --check \"server/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\""
+    "format:check": "prettier --check \"server/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\"",
+    "test:lua": "luac5.1 -p client/client.lua && lua5.1 tests/lua/run.lua"
   },
   "keywords": [],
   "author": "",

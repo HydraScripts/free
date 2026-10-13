@@ -47,3 +47,7 @@ jobs:
         run: npm run test:redis
         env:
           REDIS_URL: "redis://127.0.0.1:6379/15"
+      - name: Install Lua 5.1 for the client test
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+      - name: Client loader test
+        run: npm run test:lua
