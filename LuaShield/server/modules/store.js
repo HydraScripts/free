@@ -29,6 +29,9 @@ function memoryStore({ MaxKeys = 50000 } = {}) {
     return {
         kind: "memory",
         redis: null,
+        async ping() {
+            return true;
+        },
         async put(Key, Value, TTL) {
             if (Entries.size >= MaxKeys) prune();
             if (Entries.size >= MaxKeys) return false;
@@ -108,6 +111,9 @@ function redisStore(Url) {
     return {
         kind: "redis",
         redis: Client,
+        async ping() {
+            return (await Client.ping()) === "PONG";
+        },
         async put(Key, Value, TTL) {
             await Client.set(K(Key), JSON.stringify(Value), "PX", TTL);
             return true;

@@ -5,7 +5,13 @@ const prisma = new PrismaClient();
 
 module.exports = class Database {
     constructor() {
-        
+
+    }
+
+    // Cheap round-trip for readiness checks.
+    async Ping() {
+        await prisma.$runCommandRaw({ ping: 1 });
+        return true;
     }
 
     async GetWhitelist(Key) {

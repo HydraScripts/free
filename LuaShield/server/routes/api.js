@@ -117,21 +117,10 @@ async function ObfuscateWhitelist(Script, FileName) {
     return data;
 }
 
+// Bump the patch component. No rollover: a 10th patch is v1.0.10, not v1.1.0.
 function IncrementScriptVersion(version) {
-    let Collums = version.slice(1).split(".").map(s => parseInt(s));
-    Collums[2]++;
-
-    if (Collums[2] >= 10) {
-        Collums[2] = 0;
-        Collums[1]++;
-    }
-
-    if (Collums[1] >= 10) {
-        Collums[1] = 0;
-        Collums[0]++;
-    }
-
-    return `v${Collums.join(".")}`;
+    const [Major, Minor, Patch] = version.slice(1).split(".").map(Part => parseInt(Part, 10) || 0);
+    return `v${Major}.${Minor}.${Patch + 1}`;
 }
 
 function AddToAuditLog(Username, IP, Log) {
@@ -1376,3 +1365,4 @@ async function routes(fastify, options) {
 }
 
 module.exports = routes;
+module.exports.IncrementScriptVersion = IncrementScriptVersion;

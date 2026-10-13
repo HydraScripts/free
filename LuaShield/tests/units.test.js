@@ -62,3 +62,36 @@ test("audit log appends lines, merges the legacy JSON file and rejects unsafe na
     }
     assert.deepEqual(AuditLog.read(Name), []);
 });
+
+test("script versions bump the patch with no rollover", () => {
+    const { IncrementScriptVersion } = require("../server/routes/api");
+    assert.equal(IncrementScriptVersion("v1.0.0"), "v1.0.1");
+    assert.equal(IncrementScriptVersion("v1.0.9"), "v1.0.10");
+    assert.equal(IncrementScriptVersion("v2.9.99"), "v2.9.100");
+});
+
+test("webhook delivery retries 429/5xx and gives up on 4xx", async () => {
+    const Webhooks = require("../server/modules/webhooks");
+    const Url = "https://discord.com/api/webhooks/1/abc-DEF_1";
+    const RealFetch = global.fetch;
+    try {
+        // 429 (no retry-after) then success: should retry and resolve.
+        let Calls = 0;
+        global.fetch = async () => {
+            Calls++;
+            return Calls === 1
+                ? { ok: false, status: 429, headers: { get: () => null } }
+                : { ok: true, status: 204, headers: { get: () => null } };
+        };
+        await Webhooks.UserWebhook(Url, { content: "hi" });
+        assert.equal(Calls, 2);
+
+        // 400 is permanent: one call, then throw.
+        Calls = 0;
+        global.fetch = async () => { Calls++; return { ok: false, status: 400, headers: { get: () => null } }; };
+        await assert.rejects(Webhooks.UserWebhook(Url, { content: "hi" }));
+        assert.equal(Calls, 1);
+    } finally {
+        global.fetch = RealFetch;
+    }
+});

@@ -49,3 +49,10 @@ test("a password shorter than 12 characters is rejected at signup", async () => 
     });
     assert.equal(Response.statusCode, 400);
 });
+
+test("liveness is always ok; readiness is 503 without a database", async () => {
+    assert.equal((await App.inject({ method: "GET", url: "/healthz" })).statusCode, 200);
+    const Ready = await App.inject({ method: "GET", url: "/readyz" });
+    assert.equal(Ready.statusCode, 503);
+    assert.equal(Ready.json().checks.mongo, false);
+});

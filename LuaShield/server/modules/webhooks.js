@@ -10,18 +10,44 @@ function Clean(Value, Max = 200) {
     return String(Value ?? "").replace(/[`\u0000-\u001f]/g, "").slice(0, Max);
 }
 
+const MaxAttempts = Number(process.env.WEBHOOK_MAX_ATTEMPTS) || 4;
+const sleep = Ms => new Promise(Resolve => setTimeout(Resolve, Ms));
+
+// Discord rate-limits (429) and has transient 5xx. Retry those, honouring Retry-After,
+// with exponential backoff; 4xx other than 429 is a permanent failure and is not retried.
 async function Post(Url, Body) {
     if (!IsDiscordWebhook(Url)) throw new Error("Not a Discord webhook URL");
-    const Response = await fetch(Url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...Body, allowed_mentions: { parse: [] } }),
-        redirect: "error",
-        signal: AbortSignal.timeout(5000)
-    });
-    if (!Response.ok && Response.status !== 204) {
-        throw new Error(`Webhook responded with ${Response.status}`);
+    const Payload = JSON.stringify({ ...Body, allowed_mentions: { parse: [] } });
+    let LastStatus = 0;
+    for (let Attempt = 1; Attempt <= MaxAttempts; Attempt++) {
+        let Response;
+        try {
+            Response = await fetch(Url, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: Payload,
+                redirect: "error",
+                signal: AbortSignal.timeout(5000)
+            });
+        } catch (er) {
+            // Network error / timeout: retry unless this was the last attempt.
+            if (Attempt === MaxAttempts) throw er;
+            await sleep(Math.min(250 * 2 ** (Attempt - 1), 4000));
+            continue;
+        }
+        if (Response.ok || Response.status === 204) return;
+        LastStatus = Response.status;
+        const Retryable = Response.status === 429 || Response.status >= 500;
+        if (!Retryable || Attempt === MaxAttempts) {
+            throw new Error(`Webhook responded with ${Response.status}`);
+        }
+        const RetryAfter = Number(Response.headers.get("retry-after"));
+        const Backoff = Number.isFinite(RetryAfter) && RetryAfter > 0
+            ? Math.min(RetryAfter * 1000, 10000)
+            : Math.min(250 * 2 ** (Attempt - 1), 4000);
+        await sleep(Backoff);
     }
+    throw new Error(`Webhook failed after ${MaxAttempts} attempts (last status ${LastStatus})`);
 }
 
 // Alerts must never break authentication, so failures are logged and swallowed.

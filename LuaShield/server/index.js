@@ -35,6 +35,7 @@ async function build(Options = {}) {
         ...(Store.redis ? { redis: Store.redis, nameSpace: "ls:rl:" } : {})
     });
 
+    fastify.register(require("./routes/health"));
     fastify.register(require("./routes/auth"), { prefix: "/auth" });
     fastify.register(require("./routes/verify"), { prefix: "/verify" });
     fastify.register(require("./routes/api"));
