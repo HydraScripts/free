@@ -65,3 +65,11 @@ test("admin bootstrap and verify reject a wrong or unset admin key", async () =>
         payload: { username: "root", auth: "nope", email: "a@b.co", password: "LongEnoughPass1" }
     })).statusCode, 401);
 });
+
+test("metrics endpoint exposes Prometheus text", async () => {
+    const Response = await App.inject({ method: "GET", url: "/metrics" });
+    assert.equal(Response.statusCode, 200);
+    assert.match(Response.headers["content-type"], /text\/plain/);
+    assert.match(Response.body, /luashield_active_sessions/);
+    assert.match(Response.body, /luashield_process_cpu_user_seconds_total|luashield_nodejs/);
+});

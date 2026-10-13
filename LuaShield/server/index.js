@@ -36,6 +36,7 @@ async function build(Options = {}) {
     });
 
     fastify.register(require("./routes/health"));
+    fastify.register(require("./routes/metrics"));
     fastify.register(require("./routes/auth"), { prefix: "/auth" });
     fastify.register(require("./routes/verify"), { prefix: "/verify" });
     fastify.register(require("./routes/api"));
