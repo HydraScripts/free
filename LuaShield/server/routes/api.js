@@ -7,6 +7,10 @@ const { Luraph } = require("luraph");
 const Passwords = require("../modules/password");
 const Sessions = require("../modules/sessions");
 const Store = require("../modules/store");
+const { failureLimiter } = require("../modules/throttle");
+
+// Per-account lockout, independent of IP: a distributed guess attack from many IPs still trips it.
+const AccountFailures = failureLimiter({ Name: "account", Max: 10, WindowMs: 15 * 60_000 });
 const AuditLog = require("../modules/auditlog");
 const { randomUUID } = require("node:crypto");
 const { linkSync, unlinkSync } = require("node:fs");
@@ -402,21 +406,38 @@ async function routes(fastify, options) {
         };
     })
 
-    // Verified against a throwaway hash when the user is unknown so timing doesn't reveal valid usernames.
+    // Returns { locked } when the account is temporarily locked, { buyer } on success, or {} on a
+    // bad password. A throwaway hash is verified for unknown users so timing doesn't reveal which
+    // usernames exist. Failed attempts are counted per-account and lock it after the limit.
     let DummyHash;
     async function AuthenticateBuyer(Username, Password) {
+        const Key = String(Username || "").toLowerCase();
+        if (await AccountFailures.blocked(Key)) return { locked: true };
+
         const Buyer = await Database.GetBuyerFromUsername(Username);
         if (!Buyer) {
             DummyHash = DummyHash || await Passwords.hash(crypto.randomSecret());
             await Passwords.verify(DummyHash, Password);
-            return null;
+            await AccountFailures.record(Key);
+            return {};
         }
         const Check = await Passwords.verify(Buyer.Password, Password);
-        if (!Check.valid) return null;
+        if (!Check.valid) {
+            await AccountFailures.record(Key);
+            return {};
+        }
         if (Check.legacy) {
             await Database.UpdatePasswordIfMatch(Buyer.APIKey, Buyer.Password, await Passwords.hash(Password));
         }
-        return Buyer;
+        return { buyer: Buyer };
+    }
+
+    // Shared reply for the three password-authenticated routes.
+    function denyAuth(reply, Result) {
+        if (Result.locked) {
+            return reply.status(429).send({ error: "Too many failed attempts, try again later" });
+        }
+        return reply.status(401).send({ error: "Incorrect username or password" });
     }
 
     fastify.post("/signup", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } }, schema: { body: SignupSchema, response: ResponseScema }, websocket: false }, async (request, reply) => {
@@ -467,11 +488,12 @@ async function routes(fastify, options) {
     fastify.post("/login", { config: { rateLimit: { max: 8, timeWindow: "1 minute" } }, schema: { body: LoginSchema, response: ResponseScema }, websocket: false }, async (request, reply) => {
         const Password = request.body.password;
         const Username = request.body.username;
-        const Buyer = await AuthenticateBuyer(Username, Password);
+        const Result = await AuthenticateBuyer(Username, Password);
 
-        if (!Buyer) {
-            return reply.status(401).send({ error: "Incorrect username or password" });
+        if (!Result.buyer) {
+            return denyAuth(reply, Result);
         }
+        const Buyer = Result.buyer;
 
         AddToAuditLog(Username, request.ip, "Logged in");
 
@@ -481,10 +503,11 @@ async function routes(fastify, options) {
 
     // The API key is only stored as a digest, so a new one is issued on request. The old key stops working.
     fastify.post("/regenerate_api_key", { config: { rateLimit: { max: 3, timeWindow: "1 minute" } }, schema: { body: LoginSchema, response: ResponseScema }, websocket: false }, async (request, reply) => {
-        const Buyer = await AuthenticateBuyer(request.body.username, request.body.password);
-        if (!Buyer) {
-            return reply.status(401).send({ error: "Incorrect username or password" });
+        const Result = await AuthenticateBuyer(request.body.username, request.body.password);
+        if (!Result.buyer) {
+            return denyAuth(reply, Result);
         }
+        const Buyer = Result.buyer;
 
         const APIKey = crypto.randomSecret();
         try {
@@ -500,11 +523,12 @@ async function routes(fastify, options) {
     fastify.post("/delete_account", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } }, schema: { body: DeleteAccount, response: ResponseScema }, websocket: false }, async (request, reply) => {
         const Password = request.body.password;
         const Username = request.body.username;
-        const Buyer = await AuthenticateBuyer(Username, Password);
+        const Result = await AuthenticateBuyer(Username, Password);
 
-        if (!Buyer) {
-            return reply.status(401).send({ error: "Incorrect username or password" });
+        if (!Result.buyer) {
+            return denyAuth(reply, Result);
         }
+        const Buyer = Result.buyer;
 
         try {
             AuditLog.remove(Username);
