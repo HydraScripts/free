@@ -17,11 +17,17 @@ async function build(Options = {}) {
             redact: ["req.headers.authorization", "req.headers[\"luashield-api-key\"]", "req.headers.cookie"]
         },
         trustProxy: process.env.TRUSTED_PROXIES ? process.env.TRUSTED_PROXIES.split(",") : false,
+        // Reject unknown body properties (Fastify strips them by default) so malformed or
+        // tampered requests fail loudly instead of being silently accepted.
+        ajv: { customOptions: { removeAdditional: false } },
         ...Options
     });
 
     fastify.addHook("onClose", () => Store.close());
-    await fastify.register(cors);
+    // Restrict the dashboard API to its own origins. CORS_ORIGINS is a comma-separated allowlist;
+    // unset leaves CORS open (handy for local/dev), which should not be used in production.
+    const Origins = (process.env.CORS_ORIGINS || "").split(",").map(O => O.trim()).filter(Boolean);
+    await fastify.register(cors, Origins.length ? { origin: Origins, credentials: true } : {});
     // With REDIS_URL set, rate-limit counters are shared across instances too.
     await fastify.register(ratelimit, {
         max: 60,

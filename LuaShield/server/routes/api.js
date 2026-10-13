@@ -184,13 +184,15 @@ async function routes(fastify, options) {
 
     const MakeProjectSchem = {
         type: "object",
+        additionalProperties: false,
         properties: {
             name: { type: "string", maxLength: 30, minLength: 3 },
             success_webhook: { type: "string", maxLength: 150, minLength: 50 },
             blacklist_webhook: { type: "string", maxLength: 150, minLength: 50 },
             unauthorized_webhook: { type: "string", maxLength: 150, minLength: 50 },
-            allowed_exploits: { 
+            allowed_exploits: {
                 type: "object",
+                additionalProperties: false,
                 properties: {
                     potassium: { type: "boolean" }
                 },
@@ -202,13 +204,15 @@ async function routes(fastify, options) {
 
     const UpdateProjectSchema = {
         type: "object",
+        additionalProperties: false,
         properties: {
             name: { type: "string", maxLength: 30, minLength: 3 },
             success_webhook: { type: "string", maxLength: 150, minLength: 50 },
             blacklist_webhook: { type: "string", maxLength: 150, minLength: 50 },
             unauthorized_webhook: { type: "string", maxLength: 150, minLength: 50 },
-            allowed_exploits: { 
+            allowed_exploits: {
                 type: "object",
+                additionalProperties: false,
                 properties: {
                     potassium: { type: "boolean" }
                 },
@@ -220,10 +224,11 @@ async function routes(fastify, options) {
 
     const WhiteistUserSchema = {
         type: "object",
+        additionalProperties: false,
         properties: {
             username: { type: "string", maxLength: 128, minLength: 3 },
-            expire: { type: "number" },
-            max_executions: { type: "number", minimum: 0 },
+            expire: { type: "integer", minimum: 0, maximum: 2147483647 },
+            max_executions: { type: "integer", minimum: 0, maximum: 1000000 },
             whitelisted: { type: "boolean" },
             note: { type: "string", minLength: 3, maxLength: 128 },
             discord_id: { type: "string", minLength: 10, maxLength: 128 }
@@ -233,11 +238,12 @@ async function routes(fastify, options) {
 
     const UpdateUserSchema = {
         type: "object",
+        additionalProperties: false,
         properties: {
             username: { type: "string", maxLength: 128, minLength: 3 },
             whitelisted: { type: "boolean" },
-            expire: { type: "number" },
-            max_executions: { type: "number", minimum: 0 },
+            expire: { type: "integer", minimum: 0, maximum: 2147483647 },
+            max_executions: { type: "integer", minimum: 0, maximum: 1000000 },
             note: { type: "string", minLength: 3, maxLength: 128 },
             discord_id: { type: "string", minLength: 10, maxLength: 128 }
         },
@@ -246,9 +252,10 @@ async function routes(fastify, options) {
     
     const SignupSchema = {
         type: "object",
+        additionalProperties: false,
         properties: {
-            email: { type: "string" },
-            password: { type: "string", minLength: 6, maxLength: 128 },
+            email: { type: "string", maxLength: 254 },
+            password: { type: "string", minLength: 12, maxLength: 128 },
             username: { type: "string", minLength: 3, maxLength: 15 },
             subscription_id: { type: "string" }
         },
@@ -257,6 +264,7 @@ async function routes(fastify, options) {
 
     const LoginSchema = {
         type: "object",
+        additionalProperties: false,
         properties: {
             password: { type: "string", minLength: 6, maxLength: 128 },
             username: { type: "string", minLength: 3, maxLength: 15 }
@@ -266,6 +274,7 @@ async function routes(fastify, options) {
 
     const UpdateScriptSchema = {
         type: "object",
+        additionalProperties: false,
         properties: {
             script: { type: "string" }, // base 64 encoded,
             script_id: { type: "string" },
@@ -276,6 +285,7 @@ async function routes(fastify, options) {
 
     const AddScriptSchema = {
         type: "object",
+        additionalProperties: false,
         properties: {
             name: { type: "string", maxLength: 30, minLength: 3 },
             script: { type: "string" }, // base 64 encoded,
@@ -285,6 +295,7 @@ async function routes(fastify, options) {
 
     const DeleteUserSchema = {
         type: "object",
+        additionalProperties: false,
         properties: {
             username: { type: "string" },
         },
@@ -293,6 +304,7 @@ async function routes(fastify, options) {
 
     const ResetKey = {
         type: "object",
+        additionalProperties: false,
         properties: {
             username: { type: "string" }
         },
@@ -301,6 +313,7 @@ async function routes(fastify, options) {
 
     const UpdateVersion = {
         type: "object",
+        additionalProperties: false,
         properties: {
             script_id: { type: "string" },
             version: { type: "string" }
@@ -310,6 +323,7 @@ async function routes(fastify, options) {
 
     const DeleteScript = {
         type: "object",
+        additionalProperties: false,
         properties: {
             script_id: { type: "string" },
         },
@@ -318,6 +332,7 @@ async function routes(fastify, options) {
 
     const DeleteAccount = {
         type: "object",
+        additionalProperties: false,
         properties: {
             password: { type: "string", minLength: 6, maxLength: 128 },
             username: { type: "string", minLength: 3, maxLength: 15 }
@@ -327,14 +342,16 @@ async function routes(fastify, options) {
 
     const ResetPassword = {
         type: "object",
+        additionalProperties: false,
         properties: {
-            password: { type: "string", minLength: 6, maxLength: 128 }
+            password: { type: "string", minLength: 12, maxLength: 128 }
         },
         required: ["password"]
     }
 
     const MakeWebhook = {
         type: "object",
+        additionalProperties: false,
         properties: {
             url: { type: "string", maxLength: 150, minLength: 50 },
             name: { type: "string", maxLength: 30, minLength: 3 }
@@ -1177,8 +1194,9 @@ async function routes(fastify, options) {
 
     const CreateSubscription = {
         type: "object",
+        additionalProperties: false,
         properties: {
-            months: { type: "number" },
+            months: { type: "integer", minimum: 1, maximum: 1200 },
             auth: { type: "string" }
         },
         required: ["months"]
@@ -1186,6 +1204,7 @@ async function routes(fastify, options) {
 
     const SetAdmin = {
         type: "object",
+        additionalProperties: false,
         properties: {
             username: { type: "string" },
             auth: { type: "string" },
@@ -1197,6 +1216,7 @@ async function routes(fastify, options) {
 
     const DeleteBuyer = {
         type: "object",
+        additionalProperties: false,
         properties: {
             email: { type: "string" }
         },

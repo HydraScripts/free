@@ -25,3 +25,27 @@ test("API routes require the API key header", async () => {
         assert.match(Response.json().error, /luashield-api-key/);
     }
 });
+
+test("request bodies reject unknown properties", async () => {
+    const Response = await App.inject({
+        method: "POST", url: "/signup",
+        payload: { email: "a@b.co", password: "LongEnoughPass1", username: "abcd", subscription_id: "x", evil: 1 }
+    });
+    assert.equal(Response.statusCode, 400);
+});
+
+test("the authorize body rejects unknown properties before touching state", async () => {
+    const Response = await App.inject({
+        method: "POST", url: "/auth/authorize",
+        payload: { challenge: "a".repeat(64), key: "k", extra: true }
+    });
+    assert.equal(Response.statusCode, 400);
+});
+
+test("a password shorter than 12 characters is rejected at signup", async () => {
+    const Response = await App.inject({
+        method: "POST", url: "/signup",
+        payload: { email: "a@b.co", password: "Short1", username: "abcd", subscription_id: "x" }
+    });
+    assert.equal(Response.statusCode, 400);
+});
