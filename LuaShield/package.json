@@ -6,7 +6,11 @@
   "scripts": {
     "test": "node --test --test-concurrency=1 tests/*.test.js",
     "migrate:api-keys": "node scripts/migrate-api-keys.js",
-    "test:redis": "REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/15} node --test --test-concurrency=1 tests/*.test.js"
+    "test:redis": "REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/15} node --test --test-concurrency=1 tests/*.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"server/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\"",
+    "format:check": "prettier --check \"server/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\""
   },
   "keywords": [],
   "author": "",
@@ -23,6 +27,8 @@
     "luraph": "^2.0.9"
   },
   "devDependencies": {
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.10",
     "prisma": "^6.19.3"
   },
   "engines": {

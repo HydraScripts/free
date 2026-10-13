@@ -509,7 +509,7 @@ async function routes(fastify, options) {
         try {
             AuditLog.remove(Username);
 
-            for (let project of Buyer.Projects) {
+            for (const project of Buyer.Projects) {
                 if (existsSync(path.join(__dirname, `../../files/projects/${project}`))) {
                     rmSync(path.join(__dirname, `../../files/projects/${project}`), { force: true, recursive: true });
                 }
@@ -552,7 +552,7 @@ async function routes(fastify, options) {
     });
 
     fastify.get("/audit_logs", { schema: { headers: HeadersSchema, response: ResponseScema }, websocket: false, preHandler: AuthenticationHandler }, async (request, reply) => {
-        let Info = await Database.GetBuyerFromAPIKey(request.APIKey);
+        const Info = await Database.GetBuyerFromAPIKey(request.APIKey);
         reply.send(AuditLog.read(Info.Username));
     });
 
@@ -634,7 +634,7 @@ async function routes(fastify, options) {
             return reply.status(403).send({ error: "This project isn't owned by you" })
         }
 
-        let Project = await Database.GetProject(ProjectID);
+        const Project = await Database.GetProject(ProjectID);
         if (!Project) {
             return reply.status(404).send({ error: "This project doesn't exist" });
         }
@@ -689,7 +689,7 @@ async function routes(fastify, options) {
         }
 
         try {
-            let Info = await Database.UpdateUser(Existing.id, Expiry, MaxExecutions, Whitelisted, Note, DiscordID);
+            const Info = await Database.UpdateUser(Existing.id, Expiry, MaxExecutions, Whitelisted, Note, DiscordID);
             return reply.send(Info);
         } catch (er) {
             return reply.status(500).send({ error: "There was an issue while updating this user" });
@@ -736,7 +736,7 @@ async function routes(fastify, options) {
         }
 
         try {
-            let Info = await Database.ResetHWID(Existing.id);
+            const Info = await Database.ResetHWID(Existing.id);
             reply.send({ success: true });
         } catch (er) {
             reply.status(500).send({ error: "There was an issue while resetting this users HWID" });
@@ -772,7 +772,7 @@ async function routes(fastify, options) {
 
         const Key = crypto.randomUUID();
         try {
-            let Info = await Database.AddUser(Username, crypto.sha512(Key), ProjectID, Expiry || undefined, MaxExecutions, Whitelisted, Note, DiscordID);
+            const Info = await Database.AddUser(Username, crypto.sha512(Key), ProjectID, Expiry || undefined, MaxExecutions, Whitelisted, Note, DiscordID);
             Info.Key = Key;
             AddToAuditLog(request.BuyerUsername, request.ip, `Created a user for project ${ProjectID} with username ${Username}`);
             reply.send(Info);
@@ -866,7 +866,7 @@ async function routes(fastify, options) {
         }
 
         try {
-            let Info = await Database.UpdateScriptVersion(Script.id, Version);
+            const Info = await Database.UpdateScriptVersion(Script.id, Version);
             reply.send(Info);
         } catch (er) {
             reply.status(500).send({ error: "There was an issue while updating the script version" });
@@ -897,7 +897,7 @@ async function routes(fastify, options) {
         }
 
         try {
-            let Info = await Database.DeleteScriptVersion(ScriptID, Version);
+            const Info = await Database.DeleteScriptVersion(ScriptID, Version);
             for (const Name of [`${Version}.lua`, `${Version}.payload.lua`]) {
                 const File = path.join(__dirname, `../../files/projects/${ProjectID}/${Script.id}/${Name}`);
                 if (existsSync(File)) rmSync(File);
@@ -965,7 +965,7 @@ async function routes(fastify, options) {
         }
 
         try {
-            let Info = await Database.UpdateProject(ProjectID, Name, SuccessWebhook, BlacklistWebhook, UnauthorizedWebhook, Exploits, Online);
+            const Info = await Database.UpdateProject(ProjectID, Name, SuccessWebhook, BlacklistWebhook, UnauthorizedWebhook, Exploits, Online);
             AddToAuditLog(request.BuyerUsername, request.ip, `Updated project ${Info.Name}`);
             reply.send(Info);
         } catch (er) {
@@ -1100,7 +1100,7 @@ async function routes(fastify, options) {
             return reply.status(400).send({ error: er.toString() });
         }
 
-        let Token = crypto.randomUUID();
+        const Token = crypto.randomUUID();
         try {
             await Database.CreateWebhook(Url, Token, WebhookName, request.APIKey);
             await Database.UpdateBuyerWebhooks(Token, request.APIKey);
@@ -1217,7 +1217,7 @@ async function routes(fastify, options) {
             return reply.status(401).send({ error: "Your account needs admin privileges" });
         }
 
-        let Info = await Database.GetAdminStats();
+        const Info = await Database.GetAdminStats();
         reply.send(Info);
     })
 
@@ -1226,7 +1226,7 @@ async function routes(fastify, options) {
             return reply.status(401).send({ error: "Your account needs admin privileges" });
         }
 
-        let Info = await Database.GetSubscriptions();
+        const Info = await Database.GetSubscriptions();
         reply.send(Info);
     });
 
@@ -1260,7 +1260,7 @@ async function routes(fastify, options) {
         try {
             AuditLog.remove(Buyer.Username);
 
-            for (let project of Buyer.Projects) {
+            for (const project of Buyer.Projects) {
                 if (existsSync(path.join(__dirname, `../../files/projects/${project}`))) {
                     rmSync(path.join(__dirname, `../../files/projects/${project}`), { force: true, recursive: true });
                 }
@@ -1289,7 +1289,7 @@ async function routes(fastify, options) {
         Reset.setMonth(Reset.getMonth() + 1);
 
         try {
-            let Info = await Database.CreateSubscription(SecondsFrom(Expire), SecondsFrom(Reset));
+            const Info = await Database.CreateSubscription(SecondsFrom(Expire), SecondsFrom(Reset));
             reply.send(Info);
         } catch (er) {
             console.log(er);
@@ -1318,7 +1318,7 @@ async function routes(fastify, options) {
         Reset.setMonth(Reset.getMonth() + 1);
 
         try {
-            let Info = await Database.UpdateSubscription(Subscription.SubscriptionID, SecondsFrom(Expire), SecondsFrom(Reset));
+            const Info = await Database.UpdateSubscription(Subscription.SubscriptionID, SecondsFrom(Expire), SecondsFrom(Reset));
             reply.send(Info);
         } catch (er) {
             console.log(er);
@@ -1354,8 +1354,8 @@ async function routes(fastify, options) {
 
         const APIKey = crypto.randomSecret();
         try {
-            let Info = await Database.CreateSubscription(SecondsFrom(Expire), SecondsFrom(Reset));
-            let Buyer = await Database.CreateAdminBuyer(Email, Username, await Passwords.hash(Password), crypto.randomUUID(), Info.SubscriptionID, crypto.sha256(APIKey));
+            const Info = await Database.CreateSubscription(SecondsFrom(Expire), SecondsFrom(Reset));
+            const Buyer = await Database.CreateAdminBuyer(Email, Username, await Passwords.hash(Password), crypto.randomUUID(), Info.SubscriptionID, crypto.sha256(APIKey));
             reply.send({ ...PublicBuyer(Buyer), APIKey });
         } catch (er) {
             console.log(er);

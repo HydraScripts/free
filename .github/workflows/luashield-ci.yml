@@ -1,0 +1,49 @@
+name: LuaShield CI
+
+on:
+  push:
+    paths:
+      - "LuaShield/**"
+      - ".github/workflows/luashield-ci.yml"
+  pull_request:
+    paths:
+      - "LuaShield/**"
+      - ".github/workflows/luashield-ci.yml"
+
+defaults:
+  run:
+    working-directory: LuaShield
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # prisma generate reads the datasource env; a dummy value is enough (no DB is contacted).
+      DATABASE_URL: "mongodb://localhost:27017/luashield"
+      LICENSE_HMAC_SECRET: "ci-secret-ci-secret-ci-secret-ci-secret"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+          cache-dependency-path: LuaShield/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - name: Unit tests (in-memory store)
+        run: npm test
+      - name: Tests against Redis
+        run: npm run test:redis
+        env:
+          REDIS_URL: "redis://127.0.0.1:6379/15"

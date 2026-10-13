@@ -1,5 +1,5 @@
 const crypto = require("../modules/crypto");
-let DiscordVerification = new Map();
+const DiscordVerification = new Map();
 
 /**
  * @param {import("fastify").FastifyInstance} fastify  Encapsulated Fastify Instance
