@@ -62,3 +62,7 @@ Older `LS_OPCODESPAM` and the legacy Lua 5.1 source-rewriting stage have been re
 Run `npm test` (in-memory store), and `npm run test:redis` with a Redis server running (defaults to `redis://127.0.0.1:6379/15`, which is **flushed**). The Redis run adds multi-instance tests: two app instances with separate memory and Redis connections sharing one Redis, covering cross-instance challenge use, concurrent double-spend, session survival across a restart, one-time payload delivery and shared lockouts. A boot test builds the full app (every route and schema) without a database. The tests run the auth routes through Fastify (including rate limiting) against an in-memory database. They cover replayed challenges, shared-IP heartbeats, failure-only lockout, expiry in seconds and legacy milliseconds, quotas, HWID-mismatch alerts, one-time payload delivery, webhook URL validation and password migration. Browser/Roblox/Potassium runtime, MongoDB transactions, API obfuscation, and actual public HTTPS deployment require live end-to-end testing.
 
 References: https://lura.ph/dashboard/documents/v15 | https://lura.ph/dashboard/documents/macros | https://docs.potassium.pro/api-reference/introduction
+
+## Deployment
+
+See [docs/OPERATIONS.md](docs/OPERATIONS.md) for Docker Compose, environment variables, scaling across instances, health probes and backups.

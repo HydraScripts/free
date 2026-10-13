@@ -1,0 +1,63 @@
+# Local/production-like stack. MongoDB runs as a single-node replica set because Prisma
+# transactions require one. On first run the mongo-init service initiates the set once.
+services:
+  mongo:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-init:
+    image: mongo:7
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    entrypoint:
+      - bash
+      - -c
+      - |
+        mongosh --host mongo:27017 --quiet --eval '
+          try { rs.status() } catch (e) {
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] })
+          }'
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "mongodb://mongo:27017/luashield?replicaSet=rs0"
+      REDIS_URL: "redis://redis:6379"
+      LICENSE_HMAC_SECRET: "${LICENSE_HMAC_SECRET:?set LICENSE_HMAC_SECRET in your .env}"
+      ADMIN_KEY: "${ADMIN_KEY:?set ADMIN_KEY in your .env}"
+      LURAPH_KEY: "${LURAPH_KEY:-}"
+      AUTH_BASE_URL: "${AUTH_BASE_URL:-http://localhost:8080}"
+      LOADER_BASE_URL: "${LOADER_BASE_URL:-http://localhost:8080}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+    ports:
+      - "8080:8080"
+    volumes:
+      - app-files:/app/files
+
+volumes:
+  mongo-data:
+  app-files:
