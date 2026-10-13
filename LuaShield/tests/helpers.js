@@ -33,6 +33,9 @@ function makeDatabase() {
     return Database;
 }
 
+// Fresh copies of the stateful modules simulate a separate server process (own memory, own Redis client).
+const Stateful = ["../server/modules/store", "../server/modules/sessions", "../server/modules/throttle", "../server/routes/auth"];
+
 function loadAuthRoutes(Database, WebhookCalls) {
     const Load = Module._load;
     Module._load = function (Name, Parent) {
@@ -44,24 +47,33 @@ function loadAuthRoutes(Database, WebhookCalls) {
         }
         return Load.apply(this, arguments);
     };
-    delete require.cache[require.resolve("../server/routes/auth")];
+    for (const Name of Stateful) delete require.cache[require.resolve(Name)];
     try {
-        return require("../server/routes/auth");
+        return { Routes: require("../server/routes/auth"), Store: require("../server/modules/store") };
     } finally {
         Module._load = Load;
     }
 }
 
-async function buildApp() {
-    const Database = makeDatabase();
+let Flushed = false;
+
+// Pass an existing Database to model a second instance in front of the same database.
+async function buildApp(Database = makeDatabase()) {
     const WebhookCalls = [];
-    const Routes = loadAuthRoutes(Database, WebhookCalls);
-    global.AuthenticationStats = { Potassium: { times: 0, total: 0 }, times: 0, total: 0 };
+    const { Routes, Store } = loadAuthRoutes(Database, WebhookCalls);
+    if (Store.redis && !Flushed) {
+        await Store.redis.flushdb();
+        Flushed = true;
+    }
     const App = require("fastify")();
-    await App.register(require("@fastify/rate-limit"), { max: 60, timeWindow: "1 minute" });
+    App.addHook("onClose", () => Store.close());
+    await App.register(require("@fastify/rate-limit"), {
+        max: 60, timeWindow: "1 minute",
+        ...(Store.redis ? { redis: Store.redis, nameSpace: "ls:rl:" } : {})
+    });
     await App.register(Routes, { prefix: "/auth" });
     await App.ready();
-    return { App, Database, WebhookCalls };
+    return { App, Database, WebhookCalls, Store };
 }
 
 function writePayload(Source) {
@@ -71,4 +83,4 @@ function writePayload(Source) {
     return () => rmSync(path.join(__dirname, "../files/projects/project1"), { recursive: true, force: true });
 }
 
-module.exports = { buildApp, writePayload };
+module.exports = { buildApp, writePayload, makeDatabase };

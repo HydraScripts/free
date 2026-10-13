@@ -6,6 +6,8 @@ const validator = require("email-validator");
 const { Luraph } = require("luraph");
 const Passwords = require("../modules/password");
 const Sessions = require("../modules/sessions");
+const Store = require("../modules/store");
+const AuditLog = require("../modules/auditlog");
 const { randomUUID } = require("node:crypto");
 const { linkSync, unlinkSync } = require("node:fs");
 const { readFileSync, mkdirSync, writeFileSync, existsSync, rmSync } = require("fs");
@@ -120,16 +122,7 @@ function IncrementScriptVersion(version) {
 }
 
 function AddToAuditLog(Username, IP, Log) {
-    if (!existsSync(path.join(__dirname, `../../files/logs/${Username}.json`))) return;
-
-    let Data = JSON.parse(readFileSync(path.join(__dirname, `../../files/logs/${Username}.json`)));
-    Data.push({
-        timestamp: Date.now(),
-        ip: IP,
-        message: Log
-    });
-
-    writeFileSync(path.join(__dirname, `../../files/logs/${Username}.json`), JSON.stringify(Data));
+    AuditLog.add(Username, IP, Log);
 }
 
 /**
@@ -379,18 +372,15 @@ async function routes(fastify, options) {
         }
     }
 
-    fastify.get("/stats", { websocket: false, schema: { response: StatsResponse } }, (request, reply) => {
-        let Stats = global.AuthenticationStats;
-        reply.send({
+    fastify.get("/stats", { websocket: false, schema: { response: StatsResponse } }, async (request, reply) => {
+        const Stats = await Store.stats();
+        const Average = (Stats.total / Stats.times) || 0;
+        return {
             online: true,
-            clients: Sessions.sessionCount(),
-            authentication_speeds: {
-                potassium: {
-                    average: (Stats.Potassium.total / Stats.Potassium.times) || 0
-                }
-            },
-            average_authentication: (Stats.total / Stats.times) || 0
-        })
+            clients: await Sessions.sessionCount(),
+            authentication_speeds: { potassium: { average: Average } },
+            average_authentication: Average
+        };
     })
 
     // Verified against a throwaway hash when the user is unknown so timing doesn't reveal valid usernames.
@@ -449,10 +439,6 @@ async function routes(fastify, options) {
         try {
             await Database.AddBuyer(Email, Username, await Passwords.hash(Password), crypto.randomUUID(), SubscriptionID, crypto.sha256(APIKey));
 
-            if (!existsSync(path.join(__dirname, `../../files/logs/${Username}.json`))) {
-                writeFileSync(path.join(__dirname, `../../files/logs/${Username}.json`), "[]");
-            }
-
             return reply.send({ APIKey: APIKey });
         } catch (er) {
             return reply.status(500).send({ error: "There was an error with creating your account" });
@@ -502,9 +488,7 @@ async function routes(fastify, options) {
         }
 
         try {
-            if (existsSync(path.join(__dirname, `../../files/logs/${Username}.json`))) {
-                rmSync(path.join(__dirname, `../../files/logs/${Username}.json`));
-            }
+            AuditLog.remove(Username);
 
             for (let project of Buyer.Projects) {
                 if (existsSync(path.join(__dirname, `../../files/projects/${project}`))) {
@@ -550,7 +534,7 @@ async function routes(fastify, options) {
 
     fastify.get("/audit_logs", { schema: { headers: HeadersSchema, response: ResponseScema }, websocket: false, preHandler: AuthenticationHandler }, async (request, reply) => {
         let Info = await Database.GetBuyerFromAPIKey(request.APIKey);
-        reply.send(readFileSync(path.join(__dirname, `../../files/logs/${Info.Username}.json`)));
+        reply.send(AuditLog.read(Info.Username));
     });
 
     // Make Project
@@ -691,7 +675,7 @@ async function routes(fastify, options) {
         }
     });
 
-    fastify.post("/projects/:id/users/reset_key", { schema: { headers: Headers, body: ResetKey, response: ResponseScema }, websocket: false,  preHandler: AuthenticationHandler }, async (request, reply) => {
+    fastify.post("/projects/:id/users/reset_key", { schema: { headers: HeadersSchema, body: ResetKey, response: ResponseScema }, websocket: false,  preHandler: AuthenticationHandler }, async (request, reply) => {
         const Username = request.body.username;
         const ProjectID = request.params.id;
 
@@ -713,7 +697,7 @@ async function routes(fastify, options) {
         }
     });
 
-    fastify.post("/projects/:id/users/reset_hwid", { schema: { headers: Headers, body: ResetKey, response: ResponseScema }, websocket: false, preHandler: AuthenticationHandler }, async (request, reply) => {
+    fastify.post("/projects/:id/users/reset_hwid", { schema: { headers: HeadersSchema, body: ResetKey, response: ResponseScema }, websocket: false, preHandler: AuthenticationHandler }, async (request, reply) => {
         const Username = request.body.username;
         const ProjectID = request.params.id;
 
@@ -1152,7 +1136,7 @@ async function routes(fastify, options) {
             return reply.status(400).send({ error: "This webhook doesn't exist" });
         }
 
-        const Session = Sessions.getSession(AccessToken);
+        const Session = await Sessions.getSession(AccessToken);
         const Project = Session && await Database.GetProject(Session.ProjectID);
         const Whitelist = Session && await Database.GetWhitelistByID(Session.WhitelistID);
         if (!Session || !Project || !Project.Online || !Project.Potassium || Webhook.Owner !== Project.Owner ||
@@ -1250,9 +1234,7 @@ async function routes(fastify, options) {
         */
 
         try {
-            if (existsSync(path.join(__dirname, `../../files/logs/${Buyer.Username}.json`))) {
-                rmSync(path.join(__dirname, `../../files/logs/${Buyer.Username}.json`));
-            }
+            AuditLog.remove(Buyer.Username);
 
             for (let project of Buyer.Projects) {
                 if (existsSync(path.join(__dirname, `../../files/projects/${project}`))) {
@@ -1350,9 +1332,6 @@ async function routes(fastify, options) {
         try {
             let Info = await Database.CreateSubscription(SecondsFrom(Expire), SecondsFrom(Reset));
             let Buyer = await Database.CreateAdminBuyer(Email, Username, await Passwords.hash(Password), crypto.randomUUID(), Info.SubscriptionID, crypto.sha256(APIKey));
-            if (!existsSync(path.join(__dirname, `../../files/logs/${Username}.json`))) {
-                writeFileSync(path.join(__dirname, `../../files/logs/${Username}.json`), "[]");
-            }
             reply.send({ ...PublicBuyer(Buyer), APIKey });
         } catch (er) {
             console.log(er);

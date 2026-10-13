@@ -2,7 +2,7 @@
 
 ## Setup
 
-Use Node.js 20+ with MongoDB **replica set** support (Prisma transactions require it).
+Use Node.js 20.19+ with MongoDB **replica set** support (Prisma transactions require it). Built on Fastify 5 and Prisma 6.
 
 ```sh
 npm install
@@ -39,7 +39,19 @@ Webhook submission uses the same session and verifies project ownership. Heartbe
 
 The script distribution endpoint `GET /s/:project/:id` returns only the obfuscated **loader**, which does not contain the protected script. The script body (obfuscated separately) is only served to an authorized session, one time. Anyone with a valid license can still capture what their own client receives, and Roblox executor/client HWIDs and IDs are not cryptographic attestations. Strong authorization must occur on the server for genuinely sensitive functions.
 
-Sessions and challenges are held in memory; deploy a single authentication instance. Multiple nodes require a shared store (such as Redis) with atomic consume, TTL and session revocation. A restart invalidates sessions. Script files are stored on local disk: persistent volumes or object storage are needed for production or multiple deployments.
+## Running several instances
+
+Challenges, sessions, one-time payload claims, failed-attempt counters, alert throttles, stats and HTTP rate limits live in a store. Without `REDIS_URL` it is in process memory: a single instance works, and a restart logs every player out. With `REDIS_URL` (Redis 6.2+, which provides `GETDEL`) all of it is shared:
+
+- a challenge can be consumed exactly once across all instances (atomic `GETDEL`), even under concurrent use
+- sessions survive an instance restart and work on any instance behind the load balancer
+- the payload is released once per session across all instances (`SET NX`)
+- failure lockouts and rate limits are counted globally
+- only SHA-256 digests of challenges and session tokens are used as keys
+
+If Redis is unreachable, requests fail with HTTP 500 within about a second. Nothing is granted.
+
+Protected scripts and audit logs are files under `files/`, so every instance must mount the same persistent volume. Script versions are write-once (temp file + hard link), and the audit log is append-only JSON lines, so concurrent writers don't lose data.
 
 ## Luraph integration
 
@@ -47,6 +59,6 @@ Older `LS_OPCODESPAM` and the legacy Lua 5.1 source-rewriting stage have been re
 
 ## Tests
 
-Run `npm test`. The tests run the auth routes through Fastify (including rate limiting) against an in-memory database. They cover replayed challenges, shared-IP heartbeats, failure-only lockout, expiry in seconds and legacy milliseconds, quotas, HWID-mismatch alerts, one-time payload delivery, webhook URL validation and password migration. Browser/Roblox/Potassium runtime, MongoDB transactions, API obfuscation, and actual public HTTPS deployment require live end-to-end testing.
+Run `npm test` (in-memory store), and `npm run test:redis` with a Redis server running (defaults to `redis://127.0.0.1:6379/15`, which is **flushed**). The Redis run adds multi-instance tests: two app instances with separate memory and Redis connections sharing one Redis, covering cross-instance challenge use, concurrent double-spend, session survival across a restart, one-time payload delivery and shared lockouts. A boot test builds the full app (every route and schema) without a database. The tests run the auth routes through Fastify (including rate limiting) against an in-memory database. They cover replayed challenges, shared-IP heartbeats, failure-only lockout, expiry in seconds and legacy milliseconds, quotas, HWID-mismatch alerts, one-time payload delivery, webhook URL validation and password migration. Browser/Roblox/Potassium runtime, MongoDB transactions, API obfuscation, and actual public HTTPS deployment require live end-to-end testing.
 
 References: https://lura.ph/dashboard/documents/v15 | https://lura.ph/dashboard/documents/macros | https://docs.potassium.pro/api-reference/introduction

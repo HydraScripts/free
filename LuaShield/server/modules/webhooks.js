@@ -1,5 +1,3 @@
-const fetch = require("node-fetch");
-
 const Avatar = "https://i.imgur.com/6xyJbAg.png";
 const WebhookPattern = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api\/(?:v\d+\/)?webhooks\/\d+\/[\w-]+$/;
 
@@ -19,8 +17,7 @@ async function Post(Url, Body) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...Body, allowed_mentions: { parse: [] } }),
         redirect: "error",
-        timeout: 5000,
-        size: 65536
+        signal: AbortSignal.timeout(5000)
     });
     if (!Response.ok && Response.status !== 204) {
         throw new Error(`Webhook responded with ${Response.status}`);
@@ -87,7 +84,7 @@ async function SetupWebhook(Url, Name, Type) {
 
 async function CheckWebhook(Url) {
     if (!IsDiscordWebhook(Url)) throw new Error(`${Url} is not a Discord webhook`);
-    const Response = await fetch(Url, { method: "GET", redirect: "error", timeout: 5000 });
+    const Response = await fetch(Url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(5000) });
     if (Response.status !== 200) throw new Error(`${Url} doesn't exist`);
 }
 

@@ -9,8 +9,9 @@ const { evaluate } = require("../modules/license");
 const { failureLimiter, intervalGate } = require("../modules/throttle");
 
 // Only failures count toward the limit, so a busy shared IP can still log in.
-const Failures = failureLimiter({ Max: 12, WindowMs: 60_000 });
-const AlertGate = intervalGate(5_000);
+const Failures = failureLimiter({ Name: "authorize", Max: 12, WindowMs: 60_000 });
+const AlertGate = intervalGate("alert", 5_000);
+const Store = require("../modules/store");
 
 const VersionPattern = /^v\d+\.\d+\.\d+$/;
 
@@ -25,10 +26,13 @@ function SessionKey(request) {
     return Token ? "s:" + createHash("sha256").update(Token).digest("hex") : "ip:" + request.ip;
 }
 
+// Fire-and-forget: alerting must never delay or fail an authentication response.
 function Alert(Project, Type, Data) {
     const Url = Project[`${Type}Webhook`];
-    if (!Url || !AlertGate(`${Project.id}:${Type}`)) return;
-    void Webhooks[Type](Url, Data);
+    if (!Url) return;
+    AlertGate(`${Project.id}:${Type}`)
+        .then(Allowed => Allowed && Webhooks[Type](Url, Data))
+        .catch(er => console.error("Alert failed:", er.message));
 }
 
 async function routes(fastify) {
@@ -53,7 +57,7 @@ async function routes(fastify) {
         if (!Project || !Project.Online || !Project.Potassium || !await Database.GetScript(project_id, script_id)) {
             return reply.code(403).send({ error: "Unavailable" });
         }
-        const Challenge = Sessions.createChallenge({ ProjectID: project_id, ScriptID: script_id, HWID: hwid, UserID: user_id });
+        const Challenge = await Sessions.createChallenge({ ProjectID: project_id, ScriptID: script_id, HWID: hwid, UserID: user_id });
         if (!Challenge) return reply.code(429).send({ error: "Busy" });
         return { challenge: Challenge };
     });
@@ -70,13 +74,13 @@ async function routes(fastify) {
         },
         config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
     }, async (request, reply) => {
-        const Challenge = Sessions.consumeChallenge(request.body.challenge);
+        const Challenge = await Sessions.consumeChallenge(request.body.challenge);
         if (!Challenge) return reply.code(403).send({ error: "Authentication failed" });
 
         const LimitKey = `${request.ip}:${Challenge.ProjectID}`;
-        if (Failures.blocked(LimitKey)) return reply.code(429).send({ error: "Too many failed attempts" });
-        const Fail = (Status, Message) => {
-            Failures.record(LimitKey);
+        if (await Failures.blocked(LimitKey)) return reply.code(429).send({ error: "Too many failed attempts" });
+        const Fail = async (Status, Message) => {
+            await Failures.record(LimitKey);
             return reply.code(Status).send({ error: Message });
         };
 
@@ -117,17 +121,16 @@ async function routes(fastify) {
         }
 
         const User = Result.user;
-        const Token = Sessions.createSession({
+        const Token = await Sessions.createSession({
             UserID: Challenge.UserID, HWID: Challenge.HWID, WhitelistID: User.id,
             ProjectID: Challenge.ProjectID, ScriptID: Challenge.ScriptID, ScriptVersion: Script.Version
         });
         if (!Token) return reply.code(429).send({ error: "Busy" });
 
         const Duration = (Date.now() - Challenge.CreatedAt) / 1000;
-        global.AuthenticationStats.Potassium.times++;
-        global.AuthenticationStats.Potassium.total += Duration;
-        global.AuthenticationStats.times++;
-        global.AuthenticationStats.total += Duration;
+        // Best-effort: the session is already granted, so a stats failure must not fail the response.
+        Promise.all([Store.addStat("times", 1), Store.addStat("total", Duration)])
+            .catch(er => console.error("Stats update failed:", er.message));
 
         if (Project.SuccessWebhook) {
             Alert(Project, "Success", {
@@ -148,7 +151,7 @@ async function routes(fastify) {
 
     fastify.post("/heartbeat", { config: { rateLimit: { max: 15, timeWindow: "1 minute", keyGenerator: SessionKey } } }, async (request, reply) => {
         const Token = BearerToken(request);
-        const Session = Sessions.getSession(Token);
+        const Session = await Sessions.getSession(Token);
         if (!Session) return reply.code(401).send({ error: "Session expired" });
         const [Whitelist, Project, Script] = await Promise.all([
             Database.GetWhitelistByID(Session.WhitelistID),
@@ -157,28 +160,28 @@ async function routes(fastify) {
         ]);
         if (evaluate(Whitelist, { ProjectID: Session.ProjectID, HWID: Session.HWID }) ||
             !Project || !Project.Online || !Project.Potassium || !Script) {
-            Sessions.revokeSession(Token);
+            await Sessions.revokeSession(Token);
             return reply.code(403).send({ error: "License revoked" });
         }
-        Sessions.renewSession(Token);
+        if (!await Sessions.renewSession(Token)) return reply.code(401).send({ error: "Session expired" });
         return { valid: true };
     });
 
     // The protected script body is only released to an authorized session, once.
     fastify.post("/payload", { config: { rateLimit: { max: 15, timeWindow: "1 minute", keyGenerator: SessionKey } } }, async (request, reply) => {
         const Token = BearerToken(request);
-        const Session = Sessions.getSession(Token);
+        const Session = await Sessions.getSession(Token);
         if (!Session) return reply.code(401).send({ error: "Session expired" });
-        if (Session.PayloadServed) return reply.code(409).send({ error: "Payload already delivered" });
         if (!VersionPattern.test(Session.ScriptVersion)) return reply.code(404).send({ error: "Unavailable" });
-        Session.PayloadServed = true;
+        const Release = await Sessions.claimPayload(Token);
+        if (!Release) return reply.code(409).send({ error: "Payload already delivered" });
 
         const File = path.join(__dirname, "../../files/projects", Session.ProjectID, Session.ScriptID, `${Session.ScriptVersion}.payload.lua`);
         try {
             const Source = await readFile(File, "utf8");
             return reply.header("Cache-Control", "no-store").type("text/plain; charset=utf-8").send(Source);
         } catch (Error) {
-            Session.PayloadServed = false;
+            await Release();
             if (Error.code === "ENOENT") return reply.code(404).send({ error: "Unavailable" });
             throw Error;
         }

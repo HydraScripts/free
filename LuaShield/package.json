@@ -4,24 +4,28 @@
   "description": "",
   "main": "server/index.js",
   "scripts": {
-    "test": "node --test tests/*.test.js",
-    "migrate:api-keys": "node scripts/migrate-api-keys.js"
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "migrate:api-keys": "node scripts/migrate-api-keys.js",
+    "test:redis": "REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/15} node --test --test-concurrency=1 tests/*.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@fastify/cors": "^8.2.1",
-    "@fastify/rate-limit": "^8.0.0",
-    "@prisma/client": "^4.11.0",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/rate-limit": "^11.2.1",
+    "@prisma/client": "^6.19.3",
     "argon2": "^0.44.0",
     "dotenv": "^16.0.3",
     "email-validator": "^2.0.4",
-    "fastify": "^4.13.0",
-    "luraph": "^2.0.9",
-    "node-fetch": "^2.6.9"
+    "fastify": "^5.12.7",
+    "ioredis": "^5.11.1",
+    "luraph": "^2.0.9"
   },
   "devDependencies": {
-    "prisma": "^4.16.2"
+    "prisma": "^6.19.3"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }

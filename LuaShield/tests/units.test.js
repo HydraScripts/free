@@ -32,12 +32,33 @@ test("only Discord webhook URLs are accepted", async () => {
     await assert.rejects(UserWebhook("https://evil.example/x", { content: "hi" }));
 });
 
-test("failure limiter only blocks after the configured failures", () => {
-    const Limiter = failureLimiter({ Max: 2, WindowMs: 60_000 });
-    assert.equal(Limiter.blocked("k"), false);
-    Limiter.record("k");
-    assert.equal(Limiter.blocked("k"), false);
-    Limiter.record("k");
-    assert.equal(Limiter.blocked("k"), true);
-    assert.equal(Limiter.blocked("other"), false);
+test("failure limiter only blocks after the configured failures", async () => {
+    const Limiter = failureLimiter({ Name: `unit-${Date.now()}`, Max: 2, WindowMs: 60_000 });
+    assert.equal(await Limiter.blocked("k"), false);
+    await Limiter.record("k");
+    assert.equal(await Limiter.blocked("k"), false);
+    await Limiter.record("k");
+    assert.equal(await Limiter.blocked("k"), true);
+    assert.equal(await Limiter.blocked("other"), false);
+});
+
+test.after(() => require("../server/modules/store").close());
+
+test("audit log appends lines, merges the legacy JSON file and rejects unsafe names", () => {
+    const AuditLog = require("../server/modules/auditlog");
+    const { writeFileSync, mkdirSync } = require("node:fs");
+    const path = require("node:path");
+    const Name = `UnitTest${Date.now()}`;
+    mkdirSync(path.join(__dirname, "../files/logs"), { recursive: true });
+    writeFileSync(path.join(__dirname, `../files/logs/${Name}.json`), JSON.stringify([{ message: "legacy" }]));
+    try {
+        AuditLog.add(Name, "1.1.1.1", "first");
+        AuditLog.add(Name, "1.1.1.1", "second");
+        assert.deepEqual(AuditLog.read(Name).map(Entry => Entry.message), ["legacy", "first", "second"]);
+        AuditLog.add("../../etc/x", "1.1.1.1", "nope");
+        assert.deepEqual(AuditLog.read("../../etc/x"), []);
+    } finally {
+        AuditLog.remove(Name);
+    }
+    assert.deepEqual(AuditLog.read(Name), []);
 });

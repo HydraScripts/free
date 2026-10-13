@@ -2,12 +2,14 @@ const { buildApp, writePayload } = require("./helpers");
 const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const Crypto = require("../server/modules/crypto");
-const Sessions = require("../server/modules/sessions");
 
-let App, Database, WebhookCalls;
+let App, Database, WebhookCalls, Sessions;
 let Counter = 0;
 
-before(async () => ({ App, Database, WebhookCalls } = await buildApp()));
+before(async () => {
+    ({ App, Database, WebhookCalls } = await buildApp());
+    Sessions = require("../server/modules/sessions"); // the instance the app above loaded
+});
 after(() => App.close());
 
 // Every test gets its own license and client IP so rate-limit buckets don't leak between tests.
@@ -59,13 +61,13 @@ test("a bad key consumes its challenge", async () => {
     assert.equal((await authorize(User.IP, Challenge, User.Key)).statusCode, 403);
 });
 
-test("sessions are independent of a shared IP", () => {
-    const First = Sessions.createSession({ ProjectID: "p1", HWID: "hw1" });
-    const Second = Sessions.createSession({ ProjectID: "p2", HWID: "hw2" });
+test("sessions are independent of a shared IP", async () => {
+    const First = await Sessions.createSession({ ProjectID: "p1", HWID: "hw1" });
+    const Second = await Sessions.createSession({ ProjectID: "p2", HWID: "hw2" });
     assert.notEqual(First, Second);
-    Sessions.revokeSession(First);
-    assert.equal(Sessions.getSession(First), null);
-    assert.equal(Sessions.getSession(Second).HWID, "hw2");
+    await Sessions.revokeSession(First);
+    assert.equal(await Sessions.getSession(First), null);
+    assert.equal((await Sessions.getSession(Second)).HWID, "hw2");
 });
 
 test("many clients behind one IP can all keep heartbeating", async () => {
@@ -107,7 +109,7 @@ test("heartbeat rejects and revokes a disabled whitelist", async () => {
     assert.equal((await bearer("/auth/heartbeat", Token, User.IP)).statusCode, 200);
     Database.Users.get(User.Id).Whitelisted = false;
     assert.equal((await bearer("/auth/heartbeat", Token, User.IP)).statusCode, 403);
-    assert.equal(Sessions.getSession(Token), null);
+    assert.equal(await Sessions.getSession(Token), null);
 });
 
 test("expired licenses are rejected in seconds and legacy milliseconds", async () => {
