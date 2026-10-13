@@ -16,7 +16,7 @@ async function routes(fastify, options) {
 
     fastify.post("/create", { schema: { body: StageSchema }, websocket: false }, (request, reply) => {
         const Auth = request.body.auth;
-        if (Auth !== process.env.ADMIN_KEY) {
+        if (!crypto.matchesAdminKey(Auth)) {
             return reply.status(400).send({ error: "Unauthorized" });
         }
 

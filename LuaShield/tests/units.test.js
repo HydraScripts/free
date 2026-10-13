@@ -95,3 +95,22 @@ test("webhook delivery retries 429/5xx and gives up on 4xx", async () => {
         global.fetch = RealFetch;
     }
 });
+
+test("safeEqual and matchesAdminKey compare in constant time", () => {
+    const Crypto = require("../server/modules/crypto");
+    assert.equal(Crypto.safeEqual("abc", "abc"), true);
+    assert.equal(Crypto.safeEqual("abc", "abd"), false);
+    assert.equal(Crypto.safeEqual("short", "longer-value"), false);
+    assert.equal(Crypto.safeEqual("x", 123), false);
+
+    const Saved = process.env.ADMIN_KEY;
+    try {
+        delete process.env.ADMIN_KEY;
+        assert.equal(Crypto.matchesAdminKey("anything"), false); // unset key never matches
+        process.env.ADMIN_KEY = "super-secret-admin-key";
+        assert.equal(Crypto.matchesAdminKey("super-secret-admin-key"), true);
+        assert.equal(Crypto.matchesAdminKey("wrong"), false);
+    } finally {
+        if (Saved === undefined) delete process.env.ADMIN_KEY; else process.env.ADMIN_KEY = Saved;
+    }
+});

@@ -14,6 +14,10 @@ module.exports = class Database {
         return true;
     }
 
+    async CountAdmins() {
+        return prisma.buyer.count({ where: { Admin: true } });
+    }
+
     async GetWhitelist(Key) {
         return new Promise(async (resolve, reject) => {
             try {

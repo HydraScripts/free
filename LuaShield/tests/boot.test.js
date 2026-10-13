@@ -56,3 +56,12 @@ test("liveness is always ok; readiness is 503 without a database", async () => {
     assert.equal(Ready.statusCode, 503);
     assert.equal(Ready.json().checks.mongo, false);
 });
+
+test("admin bootstrap and verify reject a wrong or unset admin key", async () => {
+    // helpers does not set ADMIN_KEY, so no candidate should authorize.
+    assert.equal((await App.inject({ method: "POST", url: "/verify/create", payload: { auth: "nope" } })).statusCode, 400);
+    assert.equal((await App.inject({
+        method: "POST", url: "/create_admin",
+        payload: { username: "root", auth: "nope", email: "a@b.co", password: "LongEnoughPass1" }
+    })).statusCode, 401);
+});

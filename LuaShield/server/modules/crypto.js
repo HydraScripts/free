@@ -1,4 +1,4 @@
-const { createHash, createHmac, randomBytes, randomUUID, randomInt } = require("node:crypto");
+const { createHash, createHmac, randomBytes, randomUUID, randomInt, timingSafeEqual } = require("node:crypto");
 
 const Secret = process.env.LICENSE_HMAC_SECRET;
 if (!Secret || Secret.length < 32) {
@@ -27,4 +27,20 @@ function randomSecret() {
     return randomBytes(32).toString("hex");
 }
 
-module.exports = { sha512, sha256, randomstr, randomSecret, randomUUID };
+// Constant-time string comparison that doesn't leak length or content via timing.
+// Compares sha256 digests so inputs of different lengths are still compared safely.
+function safeEqual(A, B) {
+    if (typeof A !== "string" || typeof B !== "string") return false;
+    const DigestA = createHash("sha256").update(A).digest();
+    const DigestB = createHash("sha256").update(B).digest();
+    return timingSafeEqual(DigestA, DigestB);
+}
+
+// True only if the configured admin key is set and matches, in constant time.
+function matchesAdminKey(Candidate) {
+    const Expected = process.env.ADMIN_KEY;
+    if (!Expected) return false;
+    return safeEqual(String(Candidate ?? ""), Expected);
+}
+
+module.exports = { sha512, sha256, randomstr, randomSecret, randomUUID, safeEqual, matchesAdminKey };

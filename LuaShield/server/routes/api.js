@@ -1195,10 +1195,10 @@ async function routes(fastify, options) {
         type: "object",
         additionalProperties: false,
         properties: {
-            username: { type: "string" },
+            username: { type: "string", minLength: 3, maxLength: 15 },
             auth: { type: "string" },
-            email: { type: "string" },
-            password: { type: "string" }
+            email: { type: "string", maxLength: 254 },
+            password: { type: "string", minLength: 12, maxLength: 128 }
         },
         required: ["username", "auth", "email", "password"]
     }
@@ -1326,16 +1326,20 @@ async function routes(fastify, options) {
         }
     });
 
-    // internal endpoint
-
-    fastify.post("/create_admin", { schema: { body: SetAdmin }, websocket: false }, async (request, reply) => {
+    // Bootstrap endpoint: creates the first admin using ADMIN_KEY, then disables itself.
+    // Once any admin exists, further admins are made by an existing admin, not this route.
+    fastify.post("/create_admin", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } }, schema: { body: SetAdmin }, websocket: false }, async (request, reply) => {
         const Username = request.body.username;
         const Email = request.body.email;
         const Password = request.body.password;
         const Auth = request.body.auth;
 
-        if (Auth !== process.env.ADMIN_KEY) {
+        if (!crypto.matchesAdminKey(Auth)) {
             return reply.status(401).send({ error: "Unauthorized" });
+        }
+
+        if (await Database.CountAdmins() > 0) {
+            return reply.status(403).send({ error: "An admin already exists; create further admins from an admin account" });
         }
 
         if (await Database.GetBuyerFromEmail(Email)) {
