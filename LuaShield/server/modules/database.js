@@ -63,7 +63,9 @@ module.exports = class Database {
             const Result = await prisma.user.updateMany({
                 where: {
                     id: ID, Whitelisted: true, Executions: User.Executions,
-                    HWID: User.HWID ? User.HWID : null
+                    // In MongoDB { HWID: null } does NOT match a never-set field, so an unbound
+                    // license must be matched as null OR missing, or first-time binding never applies.
+                    ...(User.HWID ? { HWID: User.HWID } : { OR: [{ HWID: null }, { HWID: { isSet: false } }] })
                 },
                 data: {
                     Executions: { increment: 1 },

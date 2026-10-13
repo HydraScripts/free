@@ -89,8 +89,21 @@ function PublicBuyer(Buyer) {
     return Rest;
 }
 
+// Luraph's first job argument is a NODE id (from getNodes()), not the version string. Resolve it
+// from LURAPH_NODE, else the API's recommended node, cached for the process.
+let CachedNode = null;
+async function ResolveLuraphNode() {
+    if (process.env.LURAPH_NODE) return process.env.LURAPH_NODE;
+    if (CachedNode) return CachedNode;
+    const { recommendedId } = await luraph.getNodes();
+    if (!recommendedId) throw new Error("Luraph returned no available node");
+    CachedNode = recommendedId;
+    return CachedNode;
+}
+
 async function ObfuscateWhitelist(Script, FileName) {
-    const { jobId } = await luraph.createNewJob("v15", Script, FileName, {
+    const Node = await ResolveLuraphNode();
+    const { jobId } = await luraph.createNewJob(Node, Script, FileName, {
         TARGET_VERSION: "Roblox",
         STATIC_ENVIRONMENT: false
     });
@@ -663,7 +676,9 @@ async function routes(fastify, options) {
             return reply.status(404).send({ error: "This user doesn't exist" });
         }
 
-        if (!Expiry && !MaxExecutions && !Note && !DiscordID && Whitelisted === Existing.Whitelisted) {
+        // Distinguish "field omitted" from a real 0 (e.g. max_executions: 0 means unlimited).
+        if (Expiry === undefined && MaxExecutions === undefined && Note === undefined &&
+            DiscordID === undefined && Whitelisted === Existing.Whitelisted) {
             return reply.send(Existing);
         }
 
@@ -898,7 +913,7 @@ async function routes(fastify, options) {
         const Exploits = request.body.allowed_exploits;
         const Online = request.body.online;
 
-        if (Name.match(/[^A-Za-z0-9 ]/)) {
+        if (Name !== undefined && Name.match(/[^A-Za-z0-9 ]/)) {
             return reply.status(400).send({ error: "Your project name cannot include special characters" });
         }
 
@@ -956,7 +971,7 @@ async function routes(fastify, options) {
     fastify.get("/projects", { schema: { headers: HeadersSchema, response: ResponseScema }, websocket: false, preHandler: AuthenticationHandler }, async (request, reply) => {
         const Projects = await Database.GetProjects(request.APIKey);
 
-        for (Project of Projects) {
+        for (const Project of Projects) {
             const Scripts = await Database.GetScripts(Project.id);
             Project.Scripts = Scripts;
         }
