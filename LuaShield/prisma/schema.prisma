@@ -1,0 +1,87 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid()) @map("_id")
+  Key           String   @unique
+  Username      String   @unique
+  HWID          String?
+  ProjectID     String
+  Executions    Int      @default(0)
+  CrackAttempts Int      @default(0)
+  Exploit       String?
+  Whitelisted   Boolean  @default(true)
+  CreatedAt     DateTime @default(now())
+  ExpireAt      Int?
+  MaxExecutions Int      @default(0)
+  Note          String   @default("")
+  DiscordID     String?
+
+  @@unique([ProjectID, Username])
+  @@index([ProjectID, HWID])
+}
+
+model Project {
+  id                  String  @id @default(uuid()) @map("_id")
+  Executions          Int     @default(0)
+  CrackAttempts       Int     @default(0)
+  Users               Int     @default(0)
+  Name                String
+  SuccessWebhook      String
+  BlacklistWebhook    String
+  UnauthorizedWebhook String
+  Online              Boolean
+  Potassium           Boolean @default(false)
+  Owner               String
+}
+
+model Script {
+  id        String   @id @default(uuid()) @map("_id")
+  Name      String
+  ProjectID String
+  Version   String
+  Versions  String[] @default([])
+}
+
+model Buyer {
+  id             String   @id @default(uuid()) @map("_id")
+  Projects       String[] @default([])
+  Webhooks       String[] @default([])
+  Email          String   @unique
+  Password       String
+  APIKey         String   @unique // internal identifier (Owner fields reference it); never accepted as a credential
+  ApiKeyHash     String?  // sha256 of the API key presented in the luashield-api-key header
+  Username       String   @unique
+  SubscriptionID String
+  Admin          Boolean  @default(false)
+  RegisteredAt   Int
+
+  @@index([ApiKeyHash])
+}
+
+model Subscription {
+  SubscriptionID String  @id @default(uuid()) @map("_id")
+  Expire         Int // unix seconds
+  Reset          Int // unix seconds
+  Email          String? @unique
+  Obfuscations   Int?
+  Projects       Int?
+  Scripts        Int?
+}
+
+model Webhook {
+  id    String @id @default(uuid()) @map("_id")
+  Token String @unique
+  Url   String
+  Owner String
+  Name  String
+}
